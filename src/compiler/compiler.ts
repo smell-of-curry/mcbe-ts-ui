@@ -38,6 +38,7 @@ import { DEFAULT_CONFIG } from "./types";
 import type { UIDefs, GlobalVariables } from "../types";
 
 // Create jiti instance for importing TypeScript files at runtime
+// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
 const jiti = createJiti(__filename, {
   interopDefault: true,
   extensions: [".ts", ".tsx", ".js", ".jsx"],
@@ -275,9 +276,13 @@ export class UICompiler {
 
       // Use jiti to import TypeScript files at runtime
       // jiti handles TypeScript compilation and module resolution
-      const module = (await jiti.import(absolutePath, {
-        default: true,
-      })) as UIExport | { default?: UIExport };
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+      const module: UIExport | { default?: UIExport } = await jiti.import(
+        absolutePath,
+        {
+          default: true,
+        }
+      );
 
       // Get the default export (jiti may return it directly or as .default)
       const exported =

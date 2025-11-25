@@ -1,6 +1,6 @@
 {
   "name": "mcbe-ts-ui",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "A TypeScript library for generating Minecraft Bedrock JSON UI files with a fluent builder API.",
   "main": "dist/index.js",
   "module": "dist/index.js",
