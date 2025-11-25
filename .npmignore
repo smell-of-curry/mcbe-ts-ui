@@ -1,0 +1,39 @@
+# Source files (we only ship dist)
+src/
+
+# Config files
+tsconfig.json
+.eslintrc.json
+.prettierrc
+.prettierignore
+.editorconfig
+
+# Git
+.git/
+.gitignore
+.husky/
+
+# IDE
+.idea/
+.vscode/
+
+# Test
+*.test.ts
+*.spec.ts
+coverage/
+.nyc_output/
+jest.config.*
+vitest.config.*
+
+# Examples (documented in README)
+examples/
+
+# Dev dependencies / docs
+CONTRIBUTING.md
+CHANGELOG.md
+
+# Misc
+*.log
+.DS_Store
+Thumbs.db
+
