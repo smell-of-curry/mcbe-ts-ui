@@ -43,7 +43,11 @@ export {
   extend,
   fromBuilder,
   nsRef,
+  animRef,
 } from "./namespace";
+
+// Animation builder
+export { AnimationBuilder, animation } from "./animation";
 
 // ============================================================================
 // Factory Functions
@@ -65,6 +69,8 @@ import {
   EditBoxBuilder,
   SliderBuilder,
   ElementBuilder,
+  BoundLabelBuilder,
+  BoundImageBuilder,
 } from "./element";
 
 /**
@@ -125,8 +131,11 @@ export function panel(name: string): PanelBuilder {
  *   .size(150, "100%c");
  * ```
  */
-export function stackPanel(name: string): StackPanelBuilder {
-  return new StackPanelBuilder(name);
+export function stackPanel(
+  name: string,
+  orientation: "horizontal" | "vertical"
+): StackPanelBuilder {
+  return new StackPanelBuilder(name).orientation(orientation);
 }
 
 /**
@@ -191,8 +200,22 @@ export function grid(name: string): GridBuilder {
  *   .localize();
  * ```
  */
-export function label(name: string): LabelBuilder {
-  return new LabelBuilder(name);
+export function label(name: string, text: string): LabelBuilder {
+  return new LabelBuilder(name).text(text);
+}
+
+/**
+ * Specifies a incomplete label that assumes it will be bound to a property in the future.
+ *
+ * @param name
+ * @param bindingName - The name of the binding to use for the label.
+ * @returns
+ */
+export function boundLabel(
+  name: string,
+  bindingName: string = "text"
+): BoundLabelBuilder {
+  return new BoundLabelBuilder(name, bindingName);
 }
 
 /**
@@ -236,8 +259,22 @@ export function label(name: string): LabelBuilder {
  *   .fullSize();
  * ```
  */
-export function image(name: string): ImageBuilder {
-  return new ImageBuilder(name);
+export function image(name: string, texture: string): ImageBuilder {
+  return new ImageBuilder(name).texture(texture);
+}
+
+/**
+ * Specifies a incomplete image that assumes it will be bound to a property in the future.
+ *
+ * @param name
+ * @param bindingName - The name of the binding to use for the image.
+ * @returns
+ */
+export function boundImage(
+  name: string,
+  bindingName: string = "texture"
+): BoundImageBuilder {
+  return new BoundImageBuilder(name, bindingName);
 }
 
 /**

@@ -94,7 +94,10 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    *   .extends("common.button");
    * ```
    */
-  constructor(name: string, type?: ElementType) {
+  constructor(
+    name: string,
+    public type?: ElementType
+  ) {
     this.elementName = name;
     this.properties = (type ? { type } : {}) as T;
   }
@@ -230,7 +233,20 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    * panel("padded").size("100% - 20px", "100% - 20px")
    * ```
    */
-  size(width: SizeValue, height: SizeValue): this {
+  size(width: SizeValue = "default", height: SizeValue = "default"): this {
+    if (width == "100%" || height == "100%")
+      console.warn(
+        "Optimization note: Size set of 100% is not needed, as thats the default value."
+      );
+
+    const isChildPadding =
+      (typeof width === "string" && width.includes("%c + ")) ||
+      (typeof height === "string" && height.includes("%c + "));
+    if (isChildPadding)
+      console.warn(
+        "Optimization note: Use .padChildren() instead of .size() when setting child padding."
+      );
+
     this.properties.size = [width, height];
     return this;
   }
@@ -260,6 +276,7 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
 
   /**
    * Sets the element to full size (100% x 100%).
+   * NOTE: This is a useless method, as by default all elements are full size.
    *
    * Shorthand for `size("100%", "100%")`.
    *
@@ -287,6 +304,52 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    * ```
    */
   fitContent(): this {
+    return this.size("100%c", "100%c");
+  }
+
+  /**
+   * Sets the element to fit its children with additional padding.
+   *
+   * The element will size itself based on its children's total size
+   * plus the specified padding. This is useful for creating backgrounds
+   * that wrap around content with consistent margins.
+   *
+   * @param horizontal - Horizontal padding in pixels (added to both sides).
+   * @param vertical - Vertical padding in pixels (added to top and bottom).
+   *   If omitted, uses the horizontal value.
+   * @returns This builder for method chaining.
+   *
+   * @example Uniform padding
+   * ```typescript
+   * image("bg")
+   *   .texture("textures/ui/hud_tip_text_background")
+   *   .padChildren(10)
+   *   .controls(label("text").text("Hello"))
+   * // Size becomes "100%c + 10px" x "100%c + 10px"
+   * ```
+   *
+   * @example Different horizontal and vertical padding
+   * ```typescript
+   * image("text_bg")
+   *   .texture("textures/ui/hud_tip_text_background")
+   *   .padChildren(12, 5)
+   *   .controls(actionbarLabel)
+   * // Size becomes "100%c + 12px" x "100%c + 5px"
+   * ```
+   */
+  padChildren(horizontal: number, vertical?: number): this {
+    const v = vertical ?? horizontal;
+    return this.size(`100%c + ${horizontal}px`, `100%c + ${v}px`);
+  }
+
+  /**
+   * Sets the element to wrap its children.
+   *
+   * The element will size itself based on its children's total size.
+   *
+   * @returns This builder for method chaining.
+   */
+  wrapChildren(): this {
     return this.size("100%c", "100%c");
   }
 
@@ -421,6 +484,10 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    * ```
    */
   anchor(anchor: Anchor): this {
+    if (anchor == "center")
+      console.warn(
+        "Optimization note: Anchor set of center is not needed, as thats the default value."
+      );
     this.properties.anchor_from = anchor;
     this.properties.anchor_to = anchor;
     return this;
@@ -513,6 +580,10 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    * ```
    */
   alpha(value: number | string): this {
+    if (value == 1)
+      console.warn(
+        "Optimization note: Alpha set of 1 is not needed, as thats the default value."
+      );
     this.properties.alpha = value;
     return this;
   }
@@ -1099,48 +1170,122 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
   // -------------------------------------------------------------------------
 
   /**
-   * Sets a variable property.
+   * Sets a variable property, optionally with a default value.
    *
    * Variables can be overridden when extending elements.
+   * When `isDefault` is true, the variable key uses the `$name|default` format.
    *
    * @param name - The variable name ($ prefix added automatically if missing).
    * @param value - The variable value.
+   * @param isDefault - If true, formats as `$name|default` for template defaults.
+   * @returns This builder for method chaining.
+   *
+   * @example Simple variable assignment
+   * ```typescript
+   * panel("instance")
+   *   .variable("background_color", [0.1, 0.1, 0.1])
+   *   .variable("padding", 10)
+   * ```
+   *
+   * @example Variable with default (for templates)
+   * ```typescript
+   * panel("template")
+   *   .variable("visible", true, true)     // "$visible|default": true
+   *   .variable("padding", 10, true)       // "$padding|default": 10
+   *   .variable("color", [1, 0, 0], true)  // "$color|default": [1, 0, 0]
+   * ```
+   */
+  variable(name: string, value: unknown, isDefault: boolean = false): this {
+    const varName = name.startsWith("$") ? name.slice(1) : name;
+    const key = isDefault ? `$${varName}|default` : `$${varName}`;
+    (this.properties as AnyProps)[key] = value;
+    return this;
+  }
+
+  /**
+   * Sets a variable with a default value.
+   *
+   * Shorthand for `.variable(name, value, true)`.
+   * Use this when defining template variables that can be overridden.
+   *
+   * @param name - The variable name ($ prefix added automatically if missing).
+   * @param value - The default value for the variable.
    * @returns This builder for method chaining.
    *
    * @example
    * ```typescript
-   * panel("template")
-   *   .variable("background_color", [0.1, 0.1, 0.1])
-   *   .variable("padding", 10)
+   * panel("button_template")
+   *   .variableDefault("button_text", "Click Me")
+   *   .variableDefault("button_color", [0.2, 0.4, 0.8])
+   *   .variableDefault("padding", 10)
+   * // Produces:
+   * // {
+   * //   "$button_text|default": "Click Me",
+   * //   "$button_color|default": [0.2, 0.4, 0.8],
+   * //   "$padding|default": 10
+   * // }
    * ```
    */
-  variable(name: string, value: unknown): this {
-    const key = name.startsWith("$") ? name : `$${name}`;
-    (this.properties as AnyProps)[key] = value;
-    return this;
+  variableDefault(name: string, value: unknown): this {
+    return this.variable(name, value, true);
   }
 
   /**
    * Sets multiple variable properties.
    *
    * @param vars - Object with variable names and values.
+   * @param isDefault - If true, all variables use the `$name|default` format.
    * @returns This builder for method chaining.
    *
-   * @example
+   * @example Simple variables
    * ```typescript
-   * panel("template")
+   * panel("instance")
    *   .variables({
    *     background_color: [0.1, 0.1, 0.1],
    *     padding: 10,
    *     text_color: [1, 1, 1]
    *   })
    * ```
+   *
+   * @example Default variables (for templates)
+   * ```typescript
+   * panel("template")
+   *   .variables({
+   *     visible: true,
+   *     padding: 10,
+   *     color: [1, 0, 0]
+   *   }, true)
+   * ```
    */
-  variables(vars: Record<string, unknown>): this {
+  variables(vars: Record<string, unknown>, isDefault: boolean = false): this {
     for (const [key, value] of Object.entries(vars)) {
-      this.variable(key, value);
+      this.variable(key, value, isDefault);
     }
     return this;
+  }
+
+  /**
+   * Sets multiple variable properties with default values.
+   *
+   * Shorthand for `.variables(vars, true)`.
+   * Use this when defining multiple template variables.
+   *
+   * @param vars - Object with variable names and default values.
+   * @returns This builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * panel("button_template")
+   *   .variableDefaults({
+   *     button_text: "Click Me",
+   *     button_color: [0.2, 0.4, 0.8],
+   *     padding: 10,
+   *     visible: true
+   *   })
+   * ```
+   */
+  variableDefaults(vars: Record<string, unknown>): this {
+    return this.variables(vars, true);
   }
 
   // -------------------------------------------------------------------------
@@ -1598,13 +1743,12 @@ export class LabelBuilder extends ElementBuilder {
   }
 
   /**
-   * Enables text shadow.
+   * Sets the element to have a text shadow.
    *
-   * @param value - Whether to show shadow (default: true).
    * @returns This builder for method chaining.
    */
-  shadow(value: boolean = true): this {
-    return this.setProp("shadow", value);
+  shadow(): this {
+    return this.setProp("shadow", true);
   }
 
   /**
@@ -1614,6 +1758,10 @@ export class LabelBuilder extends ElementBuilder {
    * @returns This builder for method chaining.
    */
   fontSize(value: "small" | "normal" | "large" | "extra_large"): this {
+    if (value == "normal")
+      console.warn(
+        "Optimization note: Font size set of normal is not needed, as thats the default value."
+      );
     return this.setProp("font_size", value);
   }
 
@@ -1650,11 +1798,10 @@ export class LabelBuilder extends ElementBuilder {
   /**
    * Enables localization lookup.
    *
-   * @param value - Whether to localize (default: true).
    * @returns This builder for method chaining.
    */
-  localize(value: boolean = true): this {
-    return this.setProp("localize", value);
+  localize(): this {
+    return this.setProp("localize", true);
   }
 
   /**
@@ -1674,6 +1821,10 @@ export class LabelBuilder extends ElementBuilder {
    * @returns This builder for method chaining.
    */
   fontScaleFactor(value: number | string): this {
+    if (value == 1)
+      console.warn(
+        "Optimization note: Font scale factor set of 1 is not needed, as thats the default value."
+      );
     return this.setProp("font_scale_factor", value);
   }
 
@@ -1685,6 +1836,16 @@ export class LabelBuilder extends ElementBuilder {
    */
   enableProfanityFilter(value: boolean = true): this {
     return this.setProp("enable_profanity_filter", value);
+  }
+}
+
+export class BoundLabelBuilder extends LabelBuilder {
+  constructor(
+    name: string,
+    public bindingName: string = "text"
+  ) {
+    super(name);
+    this.text("#" + bindingName);
   }
 }
 
@@ -1734,6 +1895,27 @@ export class ImageBuilder extends ElementBuilder {
   }
 
   /**
+   * Sets the UV to an animation reference.
+   *
+   * This is used to animate the UV coordinates using a flip_book or uv animation.
+   * Use animRef() to generate the proper reference string.
+   *
+   * @param animationRef - The animation reference (e.g., "@namespace.anim_name").
+   * @returns This builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * image("sprite")
+   *   .texture("textures/ui/icons")
+   *   .uvAnim("@my_ui.anim__sprite_flip")
+   *   .uvSize(64, 64)
+   * ```
+   */
+  uvAnim(animationRef: string): this {
+    return this.setProp("uv", animationRef);
+  }
+
+  /**
    * Sets the UV size.
    *
    * @param width - Width in pixels.
@@ -1776,13 +1958,12 @@ export class ImageBuilder extends ElementBuilder {
   }
 
   /**
-   * Enables aspect ratio preservation.
+   * Disables aspect ratio preservation.
    *
-   * @param value - Whether to keep ratio (default: true).
    * @returns This builder for method chaining.
    */
-  keepRatio(value: boolean = true): this {
-    return this.setProp("keep_ratio", value);
+  ignoreRatio(): this {
+    return this.setProp("keep_ratio", false);
   }
 
   /**
@@ -1806,13 +1987,22 @@ export class ImageBuilder extends ElementBuilder {
   }
 
   /**
-   * Enables fill mode.
+   * Sets the element to fill its parent.
    *
-   * @param value - Whether to fill (default: true).
    * @returns This builder for method chaining.
    */
-  fill(value: boolean = true): this {
-    return this.setProp("fill", value);
+  fill(): this {
+    return this.setProp("fill", true);
+  }
+}
+
+export class BoundImageBuilder extends ImageBuilder {
+  constructor(
+    name: string,
+    public bindingName: string = "texture"
+  ) {
+    super(name);
+    this.texture("#" + bindingName);
   }
 }
 

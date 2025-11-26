@@ -94,7 +94,6 @@ export {
   type AnimationType,
   type AnimationEasing,
   type Animation,
-  type AnimationRef,
 } from "./animations";
 
 // ============================================================================

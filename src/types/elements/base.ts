@@ -576,6 +576,65 @@ export interface BaseUIProperties {
   tts_value_changed?: string;
 
   // -------------------------------------------------------------------------
+  // Common Override Properties
+  // -------------------------------------------------------------------------
+  // These properties can be overridden on any element type through control
+  // references, even if they're technically type-specific.
+
+  /**
+   * Color tint for images (RGB or RGBA).
+   * Also used for label text color.
+   * Can be set in control references on any element type for convenience.
+   *
+   * @example [1, 0, 0], [0.5, 0.5, 0.5, 1.0], "white", "$button_color"
+   */
+  color?: [number, number, number] | [number, number, number, number] | string;
+
+  /**
+   * Texture path for images.
+   * Can be set in control references for image elements.
+   */
+  texture?: string;
+
+  /**
+   * UV coordinates for images [x, y].
+   * Can be set in control references for image elements.
+   */
+  uv?: [number, number] | string;
+
+  /**
+   * UV size for images [width, height].
+   * Can be set in control references for image elements.
+   */
+  uv_size?: [number, number];
+
+  /**
+   * Text content for labels.
+   * Can be set in control references for label elements.
+   */
+  text?: string;
+
+  /**
+   * Font scale factor for labels.
+   */
+  font_scale_factor?: number | string;
+
+  /**
+   * Whether to localize text.
+   */
+  localize?: boolean;
+
+  /**
+   * Custom renderer for custom elements.
+   */
+  renderer?: string;
+
+  /**
+   * Stack panel orientation.
+   */
+  orientation?: "horizontal" | "vertical";
+
+  // -------------------------------------------------------------------------
   // Variable Properties ($ prefixed)
   // -------------------------------------------------------------------------
 

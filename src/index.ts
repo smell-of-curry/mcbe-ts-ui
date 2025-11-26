@@ -44,6 +44,9 @@ export * from "./builders";
 // Compiler
 export * from "./compiler";
 
+// Helpers
+export * from "./helpers";
+
 // ============================================================================
 // Quick Start Helpers
 // ============================================================================
@@ -142,17 +145,14 @@ export function defineUI(
  */
 export function defineMain(
   namespaceName: string,
-  mainElement: ElementBuilder,
-  options?: { filename?: string | undefined; subdir?: string | undefined }
+  mainElement: ElementBuilder
 ): UIDefinition {
   const ns = new NamespaceBuilder(namespaceName);
   // Force the element name to "main" and add it
-  ns.addRaw("main", mainElement.build());
+  ns.add(mainElement);
   const result: UIDefinition = {
     namespace: ns.build(),
   };
-  if (options?.filename !== undefined) result.filename = options.filename;
-  if (options?.subdir !== undefined) result.subdir = options.subdir;
   return result;
 }
 

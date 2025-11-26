@@ -221,7 +221,9 @@ export class UICompiler {
   /**
    * Finds all source files matching the configured pattern.
    *
-   * Recursively scans subdirectories.
+   * Handles both single files and directories. If sourceDir points to
+   * a file (with or without .ts extension), compiles just that file.
+   * Otherwise recursively scans the directory.
    *
    * @returns Array of absolute paths to source files.
    * @private
@@ -230,6 +232,22 @@ export class UICompiler {
     const sourceDir = path.resolve(this.config.sourceDir);
     const files: string[] = [];
 
+    // Check if source is a single file (with .ts extension)
+    if (fs.existsSync(sourceDir) && fs.statSync(sourceDir).isFile()) {
+      if (this.config.sourcePattern.test(path.basename(sourceDir))) {
+        files.push(sourceDir);
+      }
+      return files;
+    }
+
+    // Check if source without extension + .ts exists (user specified file without extension)
+    const sourceWithTs = sourceDir + ".ts";
+    if (fs.existsSync(sourceWithTs) && fs.statSync(sourceWithTs).isFile()) {
+      files.push(sourceWithTs);
+      return files;
+    }
+
+    // Otherwise treat as directory
     if (!fs.existsSync(sourceDir)) return files;
 
     this.findSourceFilesRecursive(sourceDir, files);

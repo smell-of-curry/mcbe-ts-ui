@@ -10,7 +10,9 @@
  */
 
 import type { UIElement, UINamespace, ControlReference } from "../types";
-import type { ElementBuilder } from "./element";
+import { ElementBuilder } from "./element";
+import type { AnimationBuilder } from "./animation";
+import type { VariableValue } from "../helpers/expressions";
 
 // ============================================================================
 // Namespace Builder
@@ -48,6 +50,12 @@ export class NamespaceBuilder {
 
   /** Raw element definitions added directly */
   private rawElements: Map<string, Record<string, unknown>> = new Map();
+
+  /** Animations added via builders */
+  private animations: Map<string, Record<string, unknown>> = new Map();
+
+  /** Variable definitions with defaults ($name|default: value) */
+  private variables: Map<string, VariableValue> = new Map();
 
   /**
    * Creates a new namespace builder.
@@ -140,6 +148,51 @@ export class NamespaceBuilder {
   }
 
   /**
+   * Adds an animation to this namespace.
+   *
+   * Animations are referenced by elements via `uv` or `anims` properties.
+   *
+   * @param anim - The animation builder to add.
+   * @returns This builder for method chaining.
+   *
+   * @example Adding animations
+   * ```typescript
+   * namespace("my_ui")
+   *   .addAnimation(
+   *     animation("anim__fade_in")
+   *       .alpha(0, 1)
+   *       .duration(0.5)
+   *   )
+   *   .addAnimation(
+   *     animation("anim__flip")
+   *       .flipBook()
+   *       .initialUV(0, 0)
+   *       .frameCount(8)
+   *       .fps(12)
+   *       .frameStep(64)
+   *   )
+   *   .build();
+   * ```
+   */
+  addAnimation(anim: AnimationBuilder): this {
+    this.animations.set(anim.getName(), anim.build());
+    return this;
+  }
+
+  /**
+   * Adds multiple animations from builders to this namespace.
+   *
+   * @param anims - The animation builders to add.
+   * @returns This builder for method chaining.
+   */
+  addAnimations(...anims: AnimationBuilder[]): this {
+    for (const anim of anims) {
+      this.addAnimation(anim);
+    }
+    return this;
+  }
+
+  /**
    * Adds a raw element definition directly to the namespace.
    *
    * Use this when you need to add element properties that aren't
@@ -179,6 +232,85 @@ export class NamespaceBuilder {
     element: Partial<UIElement> | Record<string, unknown>
   ): this {
     this.rawElements.set(name, element);
+    return this;
+  }
+
+  /**
+   * Adds a namespace-level variable definition with a default value.
+   *
+   * Variables defined this way can be overridden when elements extend
+   * templates that use them. This is the cleanest way to define
+   * reusable template variables.
+   *
+   * @param name - The variable name ($ prefix optional, will be added).
+   * @param defaultValue - The default value for the variable.
+   * @returns This builder for method chaining.
+   *
+   * @example Defining variables
+   * ```typescript
+   * namespace("my_template")
+   *   .addVariable("button_color", [0.2, 0.4, 0.8])
+   *   .addVariable("padding", 10)
+   *   .addVariable("visible", true)
+   *   .addVariable("text", "Default Text")
+   *   .addRaw("button", {
+   *     type: "panel",
+   *     color: "$button_color",
+   *     size: ["100%", "$padding"]
+   *   })
+   *   .build();
+   * // Produces:
+   * // {
+   * //   "$button_color|default": [0.2, 0.4, 0.8],
+   * //   "$padding|default": 10,
+   * //   "$visible|default": true,
+   * //   "$text|default": "Default Text",
+   * //   "button": { type: "panel", ... }
+   * // }
+   * ```
+   *
+   * @example Using with element builder
+   * ```typescript
+   * namespace("my_ui")
+   *   .addVariable("title_text", "Hello")
+   *   .add(
+   *     label("title")
+   *       .text("$title_text")
+   *       .color([1, 1, 1])
+   *   )
+   * ```
+   */
+  addVariable(name: string, defaultValue: VariableValue): this {
+    const varName = name.startsWith("$") ? name.slice(1) : name;
+    this.variables.set(`$${varName}|default`, defaultValue);
+    return this;
+  }
+
+  /**
+   * Adds multiple namespace-level variable definitions at once.
+   *
+   * Convenience method for defining several variables in one call.
+   *
+   * @param vars - Object mapping variable names to default values.
+   * @returns This builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * namespace("my_template")
+   *   .addVariables({
+   *     button_color: [0.2, 0.4, 0.8],
+   *     padding: 10,
+   *     visible: true,
+   *     text: "Default Text"
+   *   })
+   *   .addRaw("button", { type: "panel" })
+   *   .build();
+   * ```
+   */
+  addVariables(vars: Record<string, VariableValue>): this {
+    for (const [name, value] of Object.entries(vars)) {
+      this.addVariable(name, value);
+    }
     return this;
   }
 
@@ -248,6 +380,16 @@ export class NamespaceBuilder {
     const result: UINamespace = {
       namespace: this.namespaceName,
     };
+
+    // Add variables first (they're typically defined at the top)
+    for (const [name, value] of this.variables) {
+      result[name] = value as UIElement;
+    }
+
+    // Add animations
+    for (const [name, anim] of this.animations) {
+      result[name] = anim as UIElement;
+    }
 
     // Add built elements
     for (const [name, element] of this.elements) {
@@ -358,6 +500,17 @@ export function ref(
 }
 
 /**
+ * Extends a element using proper "name@base" syntax, but allows you to
+ * use the builder api to build the element.
+ *
+ * @param name
+ * @param base
+ */
+export function extend<T extends ElementBuilder>(name: string, builder: T): T {
+  return new ElementBuilder(name, builder.type).extendsFrom(builder) as T;
+}
+
+/**
  * Creates a control reference with explicit extension syntax.
  *
  * This is a more explicit alternative to including `@` in the ref name.
@@ -386,7 +539,7 @@ export function ref(
  *   )
  * ```
  */
-export function extend(
+export function extendRaw(
   name: string,
   base: string,
   overrides: Partial<UIElement> = {}
@@ -453,4 +606,27 @@ export function fromBuilder(
  */
 export function nsRef(namespace: string, element: string): string {
   return `${namespace}.${element}`;
+}
+
+/**
+ * Creates an animation reference string.
+ *
+ * Returns a string in "@namespace.animation_name" format for referencing
+ * animations in the `anims` or `uv` properties.
+ *
+ * @param namespace - The namespace name.
+ * @param animationName - The animation name within that namespace.
+ * @returns The animation reference string.
+ *
+ * @example
+ * ```typescript
+ * const fadeAnim = animRef("my_ui", "anim__fade_in");
+ * // Returns: "@my_ui.anim__fade_in"
+ *
+ * image("my_image")
+ *   .rawProp("anims", [animRef("my_ui", "anim__fade_in")])
+ * ```
+ */
+export function animRef(namespace: string, animationName: string): string {
+  return `@${namespace}.${animationName}`;
 }

@@ -1,57 +1,34 @@
 /**
- * Bedrock UI Generator - Animation Types
+ * Bedrock UI Animation Types
  *
- * Animations provide visual effects like fading, moving, and scaling
- * UI elements over time.
+ * Type definitions for UI animations in Minecraft Bedrock.
+ * Animations can be applied to elements via the `anims` property
+ * or UV animations via the `uv` property.
  *
+ * @module types/animations
  * @see https://wiki.bedrock.dev/json-ui/json-ui-documentation#animations
  */
 
-import type { Size, Color } from "./common";
-
 // ============================================================================
-// Animation Type Enum
+// Animation Types
 // ============================================================================
 
 /**
- * The type of animation to perform.
- *
- * - `"alpha"` - Fade transparency
- * - `"clip"` - Clip/reveal animation
- * - `"color"` - Color transition
- * - `"flip_book"` - Sprite sheet animation
- * - `"offset"` - Position movement
- * - `"size"` - Size change
- * - `"uv"` - UV coordinate animation
- * - `"wait"` - Delay before next animation
- * - `"aseprite_flip_book"` - Aseprite-exported animation
+ * Types of animations available in Bedrock UI.
  */
 export type AnimationType =
   | "alpha"
-  | "clip"
-  | "color"
-  | "flip_book"
   | "offset"
   | "size"
+  | "flip_book"
   | "uv"
+  | "color"
   | "wait"
-  | "aseprite_flip_book";
-
-// ============================================================================
-// Animation Easing Enum
-// ============================================================================
+  | "aseprite_flip_book"
+  | "clip";
 
 /**
- * Easing function for animation interpolation.
- * Controls the acceleration curve of the animation.
- *
- * - `"linear"` - Constant speed
- * - `"spring"` - Springy bounce effect
- * - `"in_*"` - Start slow, end fast
- * - `"out_*"` - Start fast, end slow
- * - `"in_out_*"` - Start slow, fast middle, end slow
- *
- * Available curves: bounce, expo, sine, cubic, back, elastic, quad, circ
+ * Animation easing functions.
  */
 export type AnimationEasing =
   | "linear"
@@ -79,54 +56,24 @@ export type AnimationEasing =
   | "in_out_quad"
   | "in_circ"
   | "out_circ"
-  | "in_out_circ";
+  | "in_out_circ"
+  | "in_quart"
+  | "out_quart"
+  | "in_out_quart"
+  | "in_quint"
+  | "out_quint"
+  | "in_out_quint";
 
 // ============================================================================
-// Animation Interface
+// Base Animation Properties
 // ============================================================================
 
 /**
- * An animation definition for UI elements.
- *
- * Animations are defined at the namespace level and referenced
- * by elements using the `anims` property.
- *
- * @example Fade in animation:
- * ```typescript
- * {
- *   anim_type: "alpha",
- *   duration: 0.5,
- *   from: 0,
- *   to: 1,
- *   easing: "out_cubic"
- * }
- * ```
- *
- * @example Slide in from left:
- * ```typescript
- * {
- *   anim_type: "offset",
- *   duration: 0.3,
- *   from: [-100, 0],
- *   to: [0, 0],
- *   easing: "out_expo"
- * }
- * ```
- *
- * @example Flipbook sprite animation:
- * ```typescript
- * {
- *   anim_type: "flip_book",
- *   initial_uv: [0, 0],
- *   frame_count: 8,
- *   frame_step: 16,
- *   fps: 12
- * }
- * ```
+ * Common properties for all animation types.
  */
-export interface Animation {
+export interface BaseAnimationProperties {
   /**
-   * The type of animation to perform.
+   * The type of animation.
    */
   anim_type: AnimationType;
 
@@ -137,111 +84,186 @@ export interface Animation {
   duration?: number;
 
   /**
-   * Starting value for the animation.
-   * Type depends on anim_type:
-   * - alpha: number (0-1)
-   * - offset/size: [x, y]
-   * - color: [r, g, b]
+   * Reference to the next animation to play after this one completes.
+   * Uses the format "@namespace.animation_name".
    */
-  from?: number | Size | Color;
+  next?: string;
 
   /**
-   * Ending value for the animation.
-   * Type depends on anim_type (same as `from`).
-   */
-  to?: number | Size | Color;
-
-  /**
-   * Initial UV coordinates for flip_book animations.
-   * @example [0, 0]
-   */
-  initial_uv?: [number, number];
-
-  /**
-   * Number of frames in a flip_book animation.
-   */
-  frame_count?: number;
-
-  /**
-   * Pixel step between frames in flip_book.
-   * Usually the width/height of a single frame.
-   */
-  frame_step?: number;
-
-  /**
-   * Frames per second for flip_book animations.
-   * @default 1
-   */
-  fps?: number;
-
-  /**
-   * Easing function for smooth interpolation.
+   * Easing function for the animation.
    * @default "linear"
    */
   easing?: AnimationEasing;
 
   /**
-   * Animation to play after this one completes.
-   * Reference to another animation by name.
-   *
-   * @example "@my_namespace.next_animation"
-   */
-  next?: string;
-
-  /**
-   * Destroy the element when animation ends.
-   * TODO: Figure out exact behavior and valid values
+   * Name of the element to destroy when animation ends.
    */
   destroy_at_end?: string;
 
   /**
-   * Event that triggers this animation to play.
-   * TODO: Figure out available events
-   */
-  play_event?: string;
-
-  /**
-   * Event fired when animation ends.
-   */
-  end_event?: string;
-
-  /**
-   * Event fired when animation starts.
-   */
-  start_event?: string;
-
-  /**
-   * Event that resets the animation.
-   */
-  reset_event?: string;
-
-  /**
-   * Whether the animation can play in reverse.
+   * Whether to play animation in reverse after completing.
    * @default false
    */
   reversible?: boolean;
 
   /**
-   * Whether the animation can be reset and replayed.
+   * Whether animation resets to initial state when complete.
    * @default false
    */
   resettable?: boolean;
 
   /**
-   * For alpha animations, whether to scale from
-   * the current alpha rather than the `from` value.
-   * @default false
+   * Delay before animation starts (in seconds).
    */
-  scale_from_starting_alpha?: boolean;
+  initial_wait?: number;
+
+  /**
+   * Whether animation plays from UI file being read.
+   * @default true
+   */
+  play_event?: string;
+
+  /**
+   * Event that triggers this animation.
+   */
+  start_event?: string;
+
+  /**
+   * Event that ends this animation.
+   */
+  end_event?: string;
+
+  /**
+   * Event triggered when animation completes.
+   */
+  end_value_event?: string;
 }
 
 // ============================================================================
-// Animation Reference
+// Specific Animation Types
 // ============================================================================
 
 /**
- * Reference to an animation using @ syntax.
- *
- * @example "@my_namespace.fade_in", "@common.button_pressed"
+ * Alpha (opacity) animation properties.
  */
-export type AnimationRef = `@${string}.${string}`;
+export interface AlphaAnimation extends BaseAnimationProperties {
+  anim_type: "alpha";
+  /** Starting alpha value (0-1). */
+  from?: number;
+  /** Ending alpha value (0-1). */
+  to?: number;
+}
+
+/**
+ * Offset (position) animation properties.
+ */
+export interface OffsetAnimation extends BaseAnimationProperties {
+  anim_type: "offset";
+  /** Starting offset [x, y]. */
+  from?: [number | string, number | string];
+  /** Ending offset [x, y]. */
+  to?: [number | string, number | string];
+}
+
+/**
+ * Size animation properties.
+ */
+export interface SizeAnimation extends BaseAnimationProperties {
+  anim_type: "size";
+  /** Starting size [width, height]. */
+  from?: [number | string, number | string];
+  /** Ending size [width, height]. */
+  to?: [number | string, number | string];
+}
+
+/**
+ * Color animation properties.
+ */
+export interface ColorAnimation extends BaseAnimationProperties {
+  anim_type: "color";
+  /** Starting color [r, g, b] or [r, g, b, a]. */
+  from?: [number, number, number] | [number, number, number, number];
+  /** Ending color [r, g, b] or [r, g, b, a]. */
+  to?: [number, number, number] | [number, number, number, number];
+}
+
+/**
+ * Flip book animation properties (sprite sheet animation).
+ */
+export interface FlipBookAnimation extends BaseAnimationProperties {
+  anim_type: "flip_book";
+  /** Initial UV coordinates [u, v]. */
+  initial_uv?: [number, number];
+  /** Number of frames in the animation. */
+  frame_count?: number;
+  /** Frames per second. */
+  fps?: number;
+  /** Pixel step between frames. */
+  frame_step?: number;
+  /** Whether frames are arranged horizontally or vertically. */
+  reversible?: boolean;
+}
+
+/**
+ * UV animation properties (texture coordinate animation).
+ */
+export interface UVAnimation extends BaseAnimationProperties {
+  anim_type: "uv";
+  /** Starting UV coordinates [u, v]. */
+  from?: [number, number];
+  /** Ending UV coordinates [u, v]. */
+  to?: [number, number];
+}
+
+/**
+ * Wait animation (timer/delay).
+ */
+export interface WaitAnimation extends BaseAnimationProperties {
+  anim_type: "wait";
+  /** Duration to wait in seconds. */
+  duration?: number;
+}
+
+/**
+ * Clip animation properties.
+ */
+export interface ClipAnimation extends BaseAnimationProperties {
+  anim_type: "clip";
+  /** Starting clip ratio (0-1). */
+  from?: number;
+  /** Ending clip ratio (0-1). */
+  to?: number;
+}
+
+/**
+ * Aseprite flip book animation.
+ */
+export interface AsepriteFlipBookAnimation extends BaseAnimationProperties {
+  anim_type: "aseprite_flip_book";
+  /** Initial UV coordinates. */
+  initial_uv?: [number, number];
+  /** Frame count. */
+  frame_count?: number;
+  /** Frames per second. */
+  fps?: number;
+  /** Frame step size. */
+  frame_step?: number;
+}
+
+// ============================================================================
+// Union Type
+// ============================================================================
+
+/**
+ * Union of all animation types.
+ */
+export type Animation =
+  | AlphaAnimation
+  | OffsetAnimation
+  | SizeAnimation
+  | ColorAnimation
+  | FlipBookAnimation
+  | UVAnimation
+  | WaitAnimation
+  | ClipAnimation
+  | AsepriteFlipBookAnimation;

@@ -162,6 +162,21 @@ export type Size = [SizeValue, SizeValue];
 // ============================================================================
 
 /**
+ * Negative percentage of parent element.
+ *
+ * @example "-50%", "-10%", "-25.5%"
+ */
+export type NegativePercentParent = `-${number}%`;
+
+/**
+ * Any percentage string (positive or negative, with or without decimals).
+ * This is a more permissive type for cases where strict typing is too restrictive.
+ *
+ * @example "50%", "-25%", "33.33%", "-100%"
+ */
+export type AnyPercent = `${number}%` | `-${number}%`;
+
+/**
  * Offset value for a single axis (X or Y).
  *
  * Position is relative to the parent element and TopLeft based,
@@ -171,6 +186,7 @@ export type Size = [SizeValue, SizeValue];
  * - `10` - 10 pixels offset
  * - `"10px"` - 10 pixels (string form)
  * - `"50%"` - 50% of parent's size
+ * - `"-25%"` - Negative 25% of parent's size
  * - `"50%x"` - 50% of element's width
  * - `"50%y"` - 50% of element's height
  */
@@ -178,9 +194,11 @@ export type OffsetValue =
   | PixelValue
   | PixelString
   | PercentParent
+  | NegativePercentParent
   | PercentWidth
   | PercentHeight
-  | SizeExpression;
+  | SizeExpression
+  | AnyPercent;
 
 /**
  * Offset tuple for [x, y] position relative to parent.
