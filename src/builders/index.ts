@@ -41,6 +41,7 @@ export {
   namespace,
   ref,
   extend,
+  extendRaw,
   fromBuilder,
   nsRef,
   animRef,

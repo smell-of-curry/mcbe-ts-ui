@@ -10,7 +10,7 @@
  */
 
 import type { UIElement, UINamespace, ControlReference } from "../types";
-import { ElementBuilder } from "./element";
+import type { ElementBuilder } from "./element";
 import type { AnimationBuilder } from "./animation";
 import type { VariableValue } from "../helpers/expressions";
 
@@ -500,14 +500,15 @@ export function ref(
 }
 
 /**
- * Extends a element using proper "name@base" syntax, but allows you to
- * use the builder api to build the element.
+ * Extends an element using proper "name@base" syntax, but allows you to
+ * use the builder API to continue building the element.
  *
- * @param name
- * @param base
+ * @param name - The new element name.
+ * @param builder - The base element builder to extend.
+ * @returns A new builder of the same type that extends the base.
  */
 export function extend<T extends ElementBuilder>(name: string, builder: T): T {
-  return new ElementBuilder(name, builder.type).extendsFrom(builder) as T;
+  return builder._createForExtension(name).extendsFrom(builder);
 }
 
 /**

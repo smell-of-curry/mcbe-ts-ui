@@ -47,7 +47,9 @@ import type { Color } from "../types";
  * ```
  */
 export function fromRGB(r: number, g: number, b: number): Color {
-  return [r / 255, g / 255, b / 255];
+  // Round to 2 decimal places to avoid floating point precision issues in JSON output
+  const round = (n: number) => Math.round(n * 100) / 100;
+  return [round(r / 255), round(g / 255), round(b / 255)];
 }
 
 /**

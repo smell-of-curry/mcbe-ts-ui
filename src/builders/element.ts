@@ -28,6 +28,7 @@ import type {
   ClipDirection,
   NinesliceInfo,
   CustomRenderer,
+  ColorWithAlpha,
 } from "../types";
 
 // ============================================================================
@@ -100,6 +101,21 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
   ) {
     this.elementName = name;
     this.properties = (type ? { type } : {}) as T;
+  }
+
+  /**
+   * Creates a new instance of this builder for extension purposes.
+   * Subclasses should override this to preserve their specific properties.
+   *
+   * @param name - The name for the new builder instance.
+   * @returns A new builder instance of the same type.
+   * @internal
+   */
+  _createForExtension(name: string): this {
+    return new (this.constructor as new (
+      name: string,
+      type?: ElementType
+    ) => this)(name, this.type);
   }
 
   // -------------------------------------------------------------------------
@@ -179,8 +195,10 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
   /**
    * Sets the base element to extend from another builder.
    *
-   * Convenience method that extracts the full name from a builder
-   * and uses it as the extension reference.
+   * Convenience method that extracts the name from a builder
+   * and uses it as the extension reference. Only the element name
+   * is used (not the full name with extension chain) because JSON UI
+   * extension works by referencing the element's defined name.
    *
    * @param builder - The builder whose element to extend.
    * @returns This builder for method chaining.
@@ -192,7 +210,7 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    * ```
    */
   extendsFrom(builder: ElementBuilder): this {
-    return this.extends(builder.getFullName());
+    return this.extends(builder.getName());
   }
 
   // -------------------------------------------------------------------------
@@ -710,6 +728,16 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
     return this;
   }
 
+  /**
+   * Enables the image to try to be the most pixel accurate possible
+   *
+   * @returns This builder for method chaining.
+   */
+  clipPixelPerfect(value: boolean = true): this {
+    this.properties.clip_pixelperfect = value;
+    return this;
+  }
+
   // -------------------------------------------------------------------------
   // Children/Controls
   // -------------------------------------------------------------------------
@@ -1163,6 +1191,82 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
     if (!this.properties.anims) this.properties.anims = [];
     this.properties.anims.push(...animRefs);
     return this;
+  }
+
+  // -------------------------------------------------------------------------
+  // Factory & Collection
+  // -------------------------------------------------------------------------
+
+  /**
+   * Configures this element as a factory for generating children from a collection.
+   *
+   * Factories dynamically generate child elements based on collection data.
+   * Each item in the collection creates an instance of the control template.
+   *
+   * **Special Variables Available Through Factory:**
+   *
+   * When using a factory, the generated children gain access to special variables:
+   * - `$index` - The zero-based index of the current item in the collection
+   * - Collection bindings become available (e.g., `#form_button_text`, `#form_button_texture`)
+   *
+   * These variables can be used in the control template for dynamic content
+   * based on each item's position or data in the collection.
+   *
+   * @param name - The factory name (used internally by the engine).
+   * @param controlName - Reference to the control template to instantiate
+   *   (usually a $variable like "$button" that can be overridden).
+   * @returns This builder for method chaining.
+   *
+   * @see https://wiki.bedrock.dev/json-ui/json-ui-intro - Factory variables explanation
+   * @see https://wiki.bedrock.dev/json-ui/json-ui-documentation#factory - Factory properties
+   *
+   * @example Stack panel with button factory
+   * ```typescript
+   * stackPanel("button_list", "vertical")
+   *   .factory("buttons", "$button")
+   *   .collectionName("form_buttons")
+   *   .variableDefault("button", "my_ns.button_template")
+   *   .bindings(...factoryBindings())
+   * ```
+   *
+   * @example Using $index in factory-generated items
+   * ```typescript
+   * // In the control template, $index gives the item's position:
+   * label("slot_number", "$index")  // Shows 0, 1, 2, etc.
+   * ```
+   *
+   * @example Grid with item factory
+   * ```typescript
+   * grid("inventory")
+   *   .factory("inventory_items", "my_ns.slot")
+   *   .collectionName("inventory_items")
+   * ```
+   */
+  factory(name: string, controlName: string): this {
+    return this.setProp("factory", { name, control_name: controlName });
+  }
+
+  /**
+   * Sets the collection name for factory/grid data binding.
+   *
+   * The collection provides the data source for dynamically generated
+   * children. Common collections include "form_buttons", "hotbar_items",
+   * "inventory_items", etc.
+   *
+   * @param name - The collection name.
+   * @returns This builder for method chaining.
+   *
+   * @see https://wiki.bedrock.dev/json-ui/json-ui-documentation#collection
+   *
+   * @example
+   * ```typescript
+   * stackPanel("buttons", "vertical")
+   *   .factory("buttons", "$button")
+   *   .collectionName("form_buttons")
+   * ```
+   */
+  collectionName(name: string): this {
+    return this.setProp("collection_name", name);
   }
 
   // -------------------------------------------------------------------------
@@ -1672,8 +1776,8 @@ export class GridBuilder extends ElementBuilder {
    * @param name - The collection name.
    * @returns This builder for method chaining.
    */
-  collectionName(name: string): this {
-    return this.setProp("collection_name", name);
+  override collectionName(name: string): this {
+    return super.collectionName(name);
   }
 
   /**
@@ -1738,7 +1842,7 @@ export class LabelBuilder extends ElementBuilder {
    * @param value - RGB color array or variable reference.
    * @returns This builder for method chaining.
    */
-  color(value: Color | string): this {
+  color(value: Color | ColorWithAlpha | string): this {
     return this.setProp("color", value);
   }
 
@@ -1846,6 +1950,13 @@ export class BoundLabelBuilder extends LabelBuilder {
   ) {
     super(name);
     this.text("#" + bindingName);
+  }
+
+  /**
+   * @internal
+   */
+  override _createForExtension(name: string): this {
+    return new BoundLabelBuilder(name, this.bindingName) as this;
   }
 }
 
@@ -1972,7 +2083,7 @@ export class ImageBuilder extends ElementBuilder {
    * @param value - RGB color or variable reference.
    * @returns This builder for method chaining.
    */
-  color(value: Color | string): this {
+  color(value: Color | ColorWithAlpha | string): this {
     return this.setProp("color", value);
   }
 
@@ -2003,6 +2114,13 @@ export class BoundImageBuilder extends ImageBuilder {
   ) {
     super(name);
     this.texture("#" + bindingName);
+  }
+
+  /**
+   * @internal
+   */
+  override _createForExtension(name: string): this {
+    return new BoundImageBuilder(name, this.bindingName) as this;
   }
 }
 
@@ -2178,6 +2296,16 @@ export class ToggleBuilder extends ElementBuilder {
  *   .renderer("paper_doll_renderer")
  *   .size(50, 80);
  * ```
+ *
+ * @example Hover text renderer
+ * ```typescript
+ * const tooltip = custom("tooltip")
+ *   .renderer("hover_text_renderer")
+ *   .allowClipping(false)
+ *   .layer(30);
+ * ```
+ *
+ * @see https://wiki.bedrock.dev/json-ui/json-ui-documentation#custom-render
  */
 export class CustomBuilder extends ElementBuilder {
   /**
@@ -2194,9 +2322,88 @@ export class CustomBuilder extends ElementBuilder {
    *
    * @param value - The renderer name.
    * @returns This builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * custom("tooltip")
+   *   .renderer("hover_text_renderer")
+   * ```
    */
   renderer(value: CustomRenderer): this {
     return this.setProp("renderer", value);
+  }
+
+  /**
+   * Sets whether the content respects parent clipping bounds.
+   *
+   * Setting to false allows content (like tooltips) to render
+   * outside the parent element's boundaries.
+   *
+   * @param value - Whether clipping is allowed (default: true).
+   * @returns This builder for method chaining.
+   *
+   * @example Tooltip that can extend beyond parent
+   * ```typescript
+   * custom("hover_text")
+   *   .renderer("hover_text_renderer")
+   *   .allowClipping(false) // Tooltip renders outside parent bounds
+   * ```
+   */
+  override allowClipping(value: boolean = true): this {
+    return super.allowClipping(value);
+  }
+
+  /**
+   * Sets whether to use anchored offset positioning.
+   *
+   * When true, offset is calculated from the anchor point.
+   * When false, offset is calculated from parent bounds.
+   *
+   * @param value - Whether to use anchored offset.
+   * @returns This builder for method chaining.
+   */
+  anchoredOffsetEnabled(value: boolean = true): this {
+    return this.setProp("use_anchored_offset", value);
+  }
+
+  /**
+   * Sets whether the content is contained within bounds.
+   *
+   * @param value - Whether content is contained.
+   * @returns This builder for method chaining.
+   */
+  contained(value: boolean = true): this {
+    return this.setProp("contained", value);
+  }
+
+  /**
+   * Sets the primary color for gradient renderer.
+   *
+   * @param value - RGB color array.
+   * @returns This builder for method chaining.
+   */
+  primaryColor(value: Color): this {
+    return this.setProp("primary_color", value);
+  }
+
+  /**
+   * Sets the secondary color for gradient renderer.
+   *
+   * @param value - RGB color array.
+   * @returns This builder for method chaining.
+   */
+  secondaryColor(value: Color): this {
+    return this.setProp("secondary_color", value);
+  }
+
+  /**
+   * Sets whether to force render even when hidden.
+   *
+   * @param value - Whether to force render.
+   * @returns This builder for method chaining.
+   */
+  forceRenderBelow(value: boolean = true): this {
+    return this.setProp("force_render_below", value);
   }
 }
 

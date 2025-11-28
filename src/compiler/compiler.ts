@@ -70,6 +70,9 @@ export class UICompiler {
   /** Successfully compiled files */
   private compiledFiles: CompiledUIFile[] = [];
 
+  /** Vanilla override files (not added to _ui_defs.json) */
+  private vanillaOverrideFiles: Set<string> = new Set();
+
   /** Errors encountered during compilation */
   private errors: CompilationError[] = [];
 
@@ -120,6 +123,7 @@ export class UICompiler {
 
     // Reset state
     this.compiledFiles = [];
+    this.vanillaOverrideFiles = new Set();
     this.errors = [];
     this.globalVariables = {};
 
@@ -318,6 +322,13 @@ export class UICompiler {
       const definitions = Array.isArray(exported) ? exported : [exported];
 
       for (const def of definitions) {
+        // Validate definition has required namespace property
+        if (!def || typeof def !== "object" || !def.namespace) {
+          console.log(
+            `  Skipped: ${relativePath} (invalid definition - missing namespace)`
+          );
+          continue;
+        }
         this.processDefinition(def, relativePath);
       }
     } catch (error) {
@@ -345,21 +356,42 @@ export class UICompiler {
     const sourceBasename = path.basename(sourcePath, ".ts");
     const filename = def.filename || sourceBasename;
 
-    // Get the relative directory from source dir (preserves subdirectory structure)
-    const sourceRelativeDir = path.relative(
-      sourceDir,
-      path.dirname(path.resolve(sourcePath))
-    );
-
-    // Use explicit subdir from definition, or derive from source path
-    const subdir = def.subdir ?? sourceRelativeDir;
-
-    // Build output path
     let outputPath: string;
-    if (subdir) {
-      outputPath = path.join(this.config.outputDir, subdir, `${filename}.json`);
+
+    // Check if this is a vanilla override
+    if (def.isVanillaOverride) {
+      // Output to ui/ root directory (parent of __generated__)
+      const uiRootDir = path.dirname(this.config.outputDir);
+
+      // Handle subdirectory screens (e.g., settings_sections/general_section)
+      if (def.subdir) {
+        outputPath = path.join(uiRootDir, def.subdir, `${filename}.json`);
+      } else {
+        outputPath = path.join(uiRootDir, `${filename}.json`);
+      }
+
+      // Track this file so we don't add it to _ui_defs.json
+      this.vanillaOverrideFiles.add(outputPath);
     } else {
-      outputPath = path.join(this.config.outputDir, `${filename}.json`);
+      // Get the relative directory from source dir (preserves subdirectory structure)
+      const sourceRelativeDir = path.relative(
+        sourceDir,
+        path.dirname(path.resolve(sourcePath))
+      );
+
+      // Use explicit subdir from definition, or derive from source path
+      const subdir = def.subdir ?? sourceRelativeDir;
+
+      // Build output path in __generated__ directory
+      if (subdir) {
+        outputPath = path.join(
+          this.config.outputDir,
+          subdir,
+          `${filename}.json`
+        );
+      } else {
+        outputPath = path.join(this.config.outputDir, `${filename}.json`);
+      }
     }
 
     // Generate JSON
@@ -401,6 +433,7 @@ export class UICompiler {
    * Generates and writes the _ui_defs.json file.
    *
    * Combines existing manual entries with generated file entries.
+   * Vanilla override files are excluded (they're already registered by the game).
    *
    * @returns The generated UIDefs object.
    * @private
@@ -409,8 +442,11 @@ export class UICompiler {
     // Start with existing non-generated entries
     const uiDefEntries = [...this.existingUiDefs];
 
-    // Add generated file entries
+    // Add generated file entries (excluding vanilla overrides)
     for (const file of this.compiledFiles) {
+      // Skip vanilla override files - they don't need to be in _ui_defs.json
+      if (this.vanillaOverrideFiles.has(file.outputPath)) continue;
+
       // Convert Windows paths to forward slashes and make relative
       const entry = file.outputPath.replace(/\\/g, "/");
       if (!uiDefEntries.includes(entry)) uiDefEntries.push(entry);

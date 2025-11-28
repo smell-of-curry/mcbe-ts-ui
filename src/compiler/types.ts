@@ -92,6 +92,17 @@ export interface UIDefinition {
    * @example "phud" (produces ui/__generated__/phud/filename.json)
    */
   subdir?: string | undefined;
+
+  /**
+   * Indicates this definition overrides a vanilla Minecraft UI file.
+   *
+   * When true:
+   * - File is output to ui/ root instead of ui/__generated__/
+   * - File is NOT added to _ui_defs.json (vanilla files are already registered)
+   *
+   * @default false
+   */
+  isVanillaOverride?: boolean | undefined;
 }
 
 /**

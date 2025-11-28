@@ -43,7 +43,7 @@ function parseArgs(): CLIOptions {
     source: "scripts/ui",
     output: "ui/__generated__",
     uiDefs: "ui/_ui_defs.json",
-    clean: false,
+    clean: true, // Clean output directory by default
     watch: false,
     help: false,
   };
@@ -78,6 +78,9 @@ function parseArgs(): CLIOptions {
       case "-c":
         options.clean = true;
         break;
+      case "--no-clean":
+        options.clean = false;
+        break;
       case "--watch":
       case "-w":
         options.watch = true;
@@ -106,7 +109,8 @@ Options:
                         (default: "ui/__generated__")
   --ui-defs, -d <file>  Path to _ui_defs.json file
                         (default: "ui/_ui_defs.json")
-  --clean, -c           Clean output directory before generating
+  --clean, -c           Clean output directory before generating (default: true)
+  --no-clean            Skip cleaning output directory
   --watch, -w           Watch mode (recompile on changes) [not yet implemented]
   --help, -h            Show this help message
 

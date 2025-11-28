@@ -71,7 +71,7 @@ export function phudRead(
   transform?: string
 ): Binding {
   const sourceExpr = transform
-    ? transform.replace("${prop}", sourceProperty)
+    ? transform.replace(/\$\{prop\}/g, sourceProperty)
     : sourceProperty;
 
   return {

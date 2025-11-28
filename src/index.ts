@@ -37,6 +37,7 @@
 
 // Types
 export * from "./types";
+export * from "./types/vanilla-screens";
 
 // Builders
 export * from "./builders";
@@ -55,6 +56,10 @@ import { NamespaceBuilder } from "./builders/namespace";
 import type { ElementBuilder } from "./builders/element";
 import type { UIDefinition } from "./compiler/types";
 import type { ControlReference } from "./types";
+import {
+  type VanillaScreen,
+  VANILLA_SCREEN_INFO,
+} from "./types/vanilla-screens";
 
 /**
  * Defines a UI namespace and returns it as a UIDefinition ready for export.
@@ -78,35 +83,93 @@ import type { ControlReference } from "./types";
  * });
  * ```
  *
- * @example With custom filename
- * ```typescript
- * export default defineUI("my_ui", (ns) => {
- *   ns.add(panel("main").fullSize());
- * }, { filename: "custom_name" });
- * // Outputs to: ui/__generated__/custom_name.json
- * ```
- *
- * @example With subdirectory
- * ```typescript
- * export default defineUI("phud", (ns) => {
- *   ns.add(panel("main").fullSize());
- * }, { subdir: "phud" });
- * // Outputs to: ui/__generated__/phud/phud.json
- * ```
  */
 export function defineUI(
   namespaceName: string,
   builder: (ns: NamespaceBuilder) => void,
-  options?: { filename?: string | undefined; subdir?: string | undefined }
+  options: {
+    filename?: string;
+    subdir?: string;
+  } = {}
 ): UIDefinition {
   const ns = new NamespaceBuilder(namespaceName);
   builder(ns);
   const result: UIDefinition = {
     namespace: ns.build(),
+    filename: options.filename,
+    subdir: options.subdir,
   };
-  if (options?.filename !== undefined) result.filename = options.filename;
-  if (options?.subdir !== undefined) result.subdir = options.subdir;
   return result;
+}
+
+/**
+ * Redefines (modifies) a vanilla Minecraft UI screen.
+ *
+ * Use this function to modify existing Minecraft UI files. The output:
+ * - Goes to ui/ root directory (not ui/__generated__)
+ * - Is NOT added to _ui_defs.json (vanilla screens are already registered)
+ * - Supports subdirectory screens (e.g., "settings_sections/general_section")
+ *
+ * This works by creating a JSON file that overlays/modifies the vanilla
+ * Minecraft UI definition. The namespace name must match the vanilla
+ * namespace exactly.
+ *
+ * @param screen - The vanilla screen to modify (type-safe autocomplete).
+ * @param builder - Callback function to modify the namespace.
+ * @returns A UIDefinition with isVanillaOverride set to true.
+ *
+ * @example Modify the HUD screen
+ * ```typescript
+ * export default redefineUI("hud_screen", (ns) => {
+ *   // Hide the subtitle text
+ *   ns.addRaw("hud_title_text/subtitle_frame/subtitle", {
+ *     visible: false,
+ *   });
+ *
+ *   // Add custom HUD element to root_panel
+ *   ns.addRaw("root_panel", {
+ *     modifications: [
+ *       {
+ *         array_name: "controls",
+ *         operation: "insert_back",
+ *         value: [{ "custom_hud@my_hud.main": {} }],
+ *       },
+ *     ],
+ *   });
+ * });
+ * ```
+ *
+ * @example Modify a subdirectory screen
+ * ```typescript
+ * export default redefineUI("settings_sections/general_section", (ns) => {
+ *   ns.addRaw("some_element", {
+ *     visible: false,
+ *   });
+ * });
+ * // Outputs to: ui/settings_sections/general_section.json
+ * ```
+ *
+ * @see https://wiki.bedrock.dev/json-ui/json-ui-intro
+ * @see https://github.com/ZtechNetwork/MCBVanillaResourcePack/tree/master/ui
+ */
+export function redefineUI(
+  screen: VanillaScreen,
+  builder: (ns: NamespaceBuilder) => void
+): UIDefinition {
+  // Get the screen info (namespace and optional subdir)
+  const screenInfo = VANILLA_SCREEN_INFO[screen];
+  const ns = new NamespaceBuilder(screenInfo.namespace);
+  builder(ns);
+
+  // Extract filename from screen path (e.g., "settings_sections/general_section" -> "general_section")
+  const filename = screen.includes("/") ? screen.split("/").pop()! : screen;
+
+  return {
+    namespace: ns.build(),
+    filename,
+    subdir: screenInfo.subdir, // Pass subdirectory for proper output path
+    isVanillaOverride: true,
+  };
 }
 
 /**
@@ -241,19 +304,9 @@ export function defineMultiUI(
     name: string;
     /** Builder callback function */
     builder: (ns: NamespaceBuilder) => void;
-    /** Optional output filename override */
-    filename?: string | undefined;
-    /** Optional subdirectory */
-    subdir?: string | undefined;
   }>
 ): UIDefinition[] {
-  return definitions.map(({ name, builder, filename, subdir }) => {
-    const options: {
-      filename?: string | undefined;
-      subdir?: string | undefined;
-    } = {};
-    if (filename !== undefined) options.filename = filename;
-    if (subdir !== undefined) options.subdir = subdir;
-    return defineUI(name, builder, options);
+  return definitions.map(({ name, builder }) => {
+    return defineUI(name, builder);
   });
 }
