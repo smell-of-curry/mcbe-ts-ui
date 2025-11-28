@@ -10,9 +10,99 @@
  */
 
 import type { UIElement, UINamespace, ControlReference } from "../types";
-import type { ElementBuilder } from "./element";
+import type {
+  ElementBuilder,
+  NamespaceElement,
+  PanelBuilder,
+  StackPanelBuilder,
+  GridBuilder,
+  LabelBuilder,
+  BoundLabelBuilder,
+  ImageBuilder,
+  BoundImageBuilder,
+  ButtonBuilder,
+  ToggleBuilder,
+  CustomBuilder,
+  FactoryBuilder,
+  ScrollViewBuilder,
+  ScreenBuilder,
+  InputPanelBuilder,
+  EditBoxBuilder,
+  SliderBuilder,
+} from "./element";
 import type { AnimationBuilder } from "./animation";
 import type { VariableValue } from "../helpers/expressions";
+
+// ============================================================================
+// Builder Type Remapping
+// ============================================================================
+
+/**
+ * Builder type registry - SINGLE SOURCE OF TRUTH
+ *
+ * Maps [MatchType, RemappedType<N>] for each builder class.
+ * Add new builder types here when creating new builder classes.
+ *
+ * ⚠️ ORDER MATTERS: Subclasses must come before their parent classes!
+ *    (e.g., BoundImageBuilder before ImageBuilder)
+ */
+type BuilderRegistry<N extends string> = [
+  // Subclasses first
+  [BoundImageBuilder<string>, BoundImageBuilder<N>],
+  [BoundLabelBuilder<string>, BoundLabelBuilder<N>],
+  // Parent classes after their subclasses
+  [ImageBuilder<string>, ImageBuilder<N>],
+  [LabelBuilder<string>, LabelBuilder<N>],
+  [ScreenBuilder<string>, ScreenBuilder<N>],
+  [StackPanelBuilder<string>, StackPanelBuilder<N>],
+  [GridBuilder<string>, GridBuilder<N>],
+  [ButtonBuilder<string>, ButtonBuilder<N>],
+  [ToggleBuilder<string>, ToggleBuilder<N>],
+  [CustomBuilder<string>, CustomBuilder<N>],
+  [FactoryBuilder<string>, FactoryBuilder<N>],
+  [ScrollViewBuilder<string>, ScrollViewBuilder<N>],
+  [InputPanelBuilder<string>, InputPanelBuilder<N>],
+  [EditBoxBuilder<string>, EditBoxBuilder<N>],
+  [SliderBuilder<string>, SliderBuilder<N>],
+  [PanelBuilder<string>, PanelBuilder<N>],
+  // Base class last (fallback)
+  [ElementBuilder<string>, ElementBuilder<N>],
+];
+
+/** Recursively finds and returns the first matching remapped type */
+type FindAndRemap<T, Registry extends [unknown, unknown][]> = Registry extends [
+  [infer Match, infer Result],
+  ...infer Rest extends [unknown, unknown][],
+]
+  ? T extends Match
+    ? Result
+    : FindAndRemap<T, Rest>
+  : ElementBuilder<string>;
+
+/**
+ * Remaps a builder type to use a new name type parameter.
+ * Preserves the specific builder subclass (PanelBuilder, ImageBuilder, etc.)
+ * while changing the name from the original to N.
+ */
+type RemapBuilderName<
+  T extends ElementBuilder<string>,
+  N extends string,
+> = FindAndRemap<T, BuilderRegistry<N>>;
+
+// ============================================================================
+// Namespace Builder Interface
+// ============================================================================
+
+/**
+ * Interface for namespace builders that elements can be added to.
+ * Used by ElementBuilder.addToNamespace() to decouple from concrete implementation.
+ */
+export interface INamespaceBuilder {
+  /** Gets the namespace name */
+  getName(): string;
+  /** Internal method to register an element builder */
+  _addInternal(builder: ElementBuilder<string>): void;
+}
 
 // ============================================================================
 // Namespace Builder
@@ -25,28 +115,43 @@ import type { VariableValue } from "../helpers/expressions";
  * Each namespace has a unique name and contains named element definitions
  * that can reference each other or elements from other namespaces.
  *
+ * Elements are added using `builder.addToNamespace(ns)` instead of `ns.add()`.
+ * This ensures type-safe extension references via `NamespaceElement`.
+ *
  * @example Basic usage
  * ```typescript
- * const ns = new NamespaceBuilder("my_ui")
- *   .add(panel("main").fullSize())
- *   .add(label("title").text("Hello"));
+ * const ns = new NamespaceBuilder("my_ui");
+ * const main = panel("main").fullSize().addToNamespace(ns);
+ * const title = label("title").text("Hello").addToNamespace(ns);
  *
  * const json = ns.toJSON();
  * ```
  *
- * @example Using the factory function
+ * @example Extension chain
  * ```typescript
- * const ui = namespace("my_ui")
- *   .add(panel("main").fullSize())
- *   .build();
+ * const ns = new NamespaceBuilder("my_ui");
+ * const base = panel("base").size(100, 100).addToNamespace(ns);
+ * const derived = panel("derived").extendsFrom(base).addToNamespace(ns);
  * ```
  */
-export class NamespaceBuilder {
+/** Empty elements type for initial namespace state */
+type EmptyElements = Record<never, never>;
+
+export class NamespaceBuilder<
+  TElements extends Record<
+    string,
+    NamespaceElement<ElementBuilder<string>>
+  > = EmptyElements,
+> implements INamespaceBuilder
+{
   /** The namespace name used for element references */
   private namespaceName: string;
 
-  /** Elements added via builders */
-  private elements: Map<string, Record<string, unknown>> = new Map();
+  /** Type-safe element references for cross-file imports */
+  public readonly elements: TElements;
+
+  /** Internal storage for builders - keyed by full name (for JSON output) */
+  private builders: Map<string, ElementBuilder<string>> = new Map();
 
   /** Raw element definitions added directly */
   private rawElements: Map<string, Record<string, unknown>> = new Map();
@@ -56,6 +161,10 @@ export class NamespaceBuilder {
 
   /** Variable definitions with defaults ($name|default: value) */
   private variables: Map<string, VariableValue> = new Map();
+
+  public filename?: string;
+  public subdir?: string;
+  public isVanillaOverride?: boolean;
 
   /**
    * Creates a new namespace builder.
@@ -68,8 +177,15 @@ export class NamespaceBuilder {
    * const builder = new NamespaceBuilder("my_custom_ui");
    * ```
    */
-  constructor(namespace: string) {
+  constructor(
+    namespace: string,
+    options: { filename?: string; subdir?: string } = {},
+    elements: TElements = {} as TElements
+  ) {
     this.namespaceName = namespace;
+    this.filename = options.filename;
+    this.subdir = options.subdir;
+    this.elements = elements;
   }
 
   /**
@@ -88,63 +204,50 @@ export class NamespaceBuilder {
   }
 
   /**
-   * Adds an element from an ElementBuilder to this namespace.
-   *
-   * The element will be added using its full name (including any
-   * extension reference from the `@` syntax).
-   *
-   * @param builder - The element builder to add.
-   * @returns This builder for method chaining.
-   *
-   * @example Adding a simple panel
-   * ```typescript
-   * namespace("my_ui")
-   *   .add(panel("main_panel").fullSize())
-   *   .add(label("title").text("Hello"))
-   *   .build();
-   * ```
-   *
-   * @example Adding an element that extends another
-   * ```typescript
-   * namespace("my_ui")
-   *   .add(
-   *     panel("my_button")
-   *       .extends("common.button")
-   *       .size(100, 30)
-   *   )
-   *   .build();
-   * ```
+   * Internal method called by ElementBuilder.addToNamespace().
+   * Stores the builder for JSON generation.
+   * @internal
    */
-  add(builder: ElementBuilder): this {
-    const fullName = builder.getFullName();
-    this.elements.set(fullName, builder.build() as Record<string, unknown>);
-    return this;
+  _addInternal(builder: ElementBuilder<string>): void {
+    this.builders.set(builder.getFullName(), builder);
   }
 
   /**
-   * Adds multiple elements from builders to this namespace.
+   * Adds an element to this namespace.
    *
-   * Convenience method for adding several elements at once.
-   *
-   * @param builders - The element builders to add.
-   * @returns This builder for method chaining.
+   * Returns a tuple of [element, updatedNamespace] for both immediate use
+   * and type-safe element tracking for cross-file imports.
    *
    * @example
    * ```typescript
-   * const mainPanel = panel("main").fullSize();
-   * const titleLabel = label("title").text("Hello");
-   * const contentPanel = panel("content").size("100%", "fill");
-   *
-   * namespace("my_ui")
-   *   .addAll(mainPanel, titleLabel, contentPanel)
-   *   .build();
+   * let ns = new NamespaceBuilder("my_ui");
+   * const [base, ns1] = ns.add(panel("base").size(100, 100));
+   * const [derived, ns2] = ns1.add(panel("derived").extendsFrom(base));
+   * // ns2.elements.base and ns2.elements.derived are typed
    * ```
+   *
+   * @param builder - The element builder to add.
+   * @returns Tuple of [NamespaceElement, UpdatedNamespaceBuilder]
    */
-  addAll(...builders: ElementBuilder[]): this {
-    for (const builder of builders) {
-      this.add(builder);
-    }
-    return this;
+  add<B extends ElementBuilder<N>, N extends string>(
+    builder: B
+  ): [
+    NamespaceElement<B>,
+    NamespaceBuilder<TElements & Record<N, NamespaceElement<B>>>,
+  ] {
+    const nsElement = builder.addToNamespace(this);
+    const name = builder.getName() as N;
+    const newElements = { ...this.elements, [name]: nsElement } as TElements &
+      Record<N, NamespaceElement<B>>;
+    // Return element and namespace with updated type (same instance, just retyped)
+    (this as unknown as { elements: typeof newElements }).elements =
+      newElements;
+    return [
+      nsElement,
+      this as unknown as NamespaceBuilder<
+        TElements & Record<N, NamespaceElement<B>>
+      >,
+    ];
   }
 
   /**
@@ -392,8 +495,8 @@ export class NamespaceBuilder {
     }
 
     // Add built elements
-    for (const [name, element] of this.elements) {
-      result[name] = element;
+    for (const [fullName, builder] of this.builders) {
+      result[fullName] = builder.build() as UIElement;
     }
 
     // Add raw elements
@@ -500,15 +603,60 @@ export function ref(
 }
 
 /**
- * Extends an element using proper "name@base" syntax, but allows you to
- * use the builder API to continue building the element.
+ * Extends a registered namespace element from the SAME namespace.
+ * with a different name that extends the original.
+ *
+ * Use this when you need to create multiple instances of a template
+ * with different names but the same base.
  *
  * @param name - The new element name.
- * @param builder - The base element builder to extend.
- * @returns A new builder of the same type that extends the base.
+ * @param element - The registered namespace element to extend.
+ * @returns A new builder of the same type but with the new name.
+ *
+ * @example
+ * ```typescript
+ * const baseButton = panel("button_base").size(100, 30).addToNamespace(ns);
+ * const okButton = extend("ok_button", baseButton).addToNamespace(ns);
+ * const cancelButton = extend("cancel_button", baseButton).addToNamespace(ns);
+ * ```
  */
-export function extend<T extends ElementBuilder>(name: string, builder: T): T {
-  return builder._createForExtension(name).extendsFrom(builder);
+export function extend<T extends ElementBuilder<string>, N extends string>(
+  name: N,
+  element: NamespaceElement<T>
+): RemapBuilderName<T, N> {
+  return element.builder
+    ._createForExtension(name)
+    .extendsFrom(element) as unknown as RemapBuilderName<T, N>;
+}
+
+/**
+ * Extends a registered namespace element from ANOTHER namespace.
+ *
+ * Use this when extending elements across namespace boundaries.
+ * Generates fully qualified references like "my_element@other_namespace.base_element".
+ *
+ * @param name - The new element name.
+ * @param element - The registered namespace element to extend (from another namespace).
+ * @returns A new builder of the same type but with the new name.
+ *
+ * @example
+ * ```typescript
+ * // In pokemon.ts
+ * export default defineUI("pokemon", ns => { ... });
+ *
+ * // In serverForm.ts
+ * import PokemonForm from "./pokemon";
+ * const pokemonPanel = extendExternal("pokemon_form", PokemonForm.elements["main"]!);
+ * // Generates: "pokemon_form@pokemon.main"
+ * ```
+ */
+export function extendExternal<
+  T extends ElementBuilder<string>,
+  N extends string,
+>(name: N, element: NamespaceElement<T>): RemapBuilderName<T, N> {
+  return element.builder
+    ._createForExtension(name)
+    .extendsExternallyFrom(element) as unknown as RemapBuilderName<T, N>;
 }
 
 /**
@@ -573,7 +721,7 @@ export function extendRaw(
  * ```
  */
 export function fromBuilder(
-  builder: ElementBuilder,
+  builder: ElementBuilder<string>,
   overrides: Partial<UIElement> = {}
 ): ControlReference {
   return { [builder.getFullName()]: overrides };

@@ -30,13 +30,98 @@ import type {
   CustomRenderer,
   ColorWithAlpha,
 } from "../types";
-
+import type { INamespaceBuilder } from "./namespace";
 // ============================================================================
 // Helper type for setting properties via bracket notation
 // ============================================================================
 
 /** Internal type for property access */
 type AnyProps = Record<string, unknown>;
+
+// ============================================================================
+// Namespace Element Wrapper
+// ============================================================================
+
+/**
+ * Represents an element that has been registered to a namespace.
+ *
+ * This wrapper provides type-safe extension references. Elements MUST
+ * be added to a namespace before they can be extended by other elements.
+ * This ensures compile-time safety for element references.
+ *
+ * @typeParam TBuilder - The specific ElementBuilder type being wrapped.
+ *
+ * @example Adding and extending elements
+ * ```typescript
+ * const basePanel = panel("base").size(100, 100).addToNamespace(ns);
+ * const derived = panel("derived").extendsFrom(basePanel);
+ * derived.addToNamespace(ns);
+ * ```
+ */
+export class NamespaceElement<
+  TBuilder extends ElementBuilder<string> = ElementBuilder<string>,
+> {
+  /**
+   * Creates a new NamespaceElement wrapper.
+   *
+   * @param builder - The element builder being wrapped.
+   * @param namespaceName - The namespace this element belongs to.
+   * @internal Use `builder.addToNamespace(ns)` instead of calling directly.
+   */
+  constructor(
+    public readonly builder: TBuilder,
+    public readonly namespaceName: string
+  ) {}
+
+  /**
+   * Gets the element's base name (without namespace).
+   *
+   * @returns The element name.
+   *
+   * @example
+   * ```typescript
+   * const element = panel("my_panel").addToNamespace(ns);
+   * element.getName(); // "my_panel"
+   * ```
+   */
+  getName(): string {
+    return this.builder.getName();
+  }
+
+  /**
+   * Gets the element's full name including any extension reference.
+   *
+   * @returns The full name (e.g., "my_panel@base_panel").
+   */
+  getFullName(): string {
+    return this.builder.getFullName();
+  }
+
+  /**
+   * Gets the fully qualified reference for this element.
+   *
+   * This is used when extending from another namespace.
+   *
+   * @returns The qualified name (e.g., "my_namespace.my_panel").
+   *
+   * @example
+   * ```typescript
+   * const element = panel("my_panel").addToNamespace(ns);
+   * element.getQualifiedName(); // "my_namespace.my_panel"
+   * ```
+   */
+  getQualifiedName(): string {
+    return `${this.namespaceName}.${this.builder.getName()}`;
+  }
+
+  /**
+   * Access the underlying builder's properties.
+   * Use this when you need to read builder configuration.
+   */
+  getBuilder(): TBuilder {
+    return this.builder;
+  }
+}
 
 // ============================================================================
 // Base Element Builder
@@ -67,12 +152,15 @@ type AnyProps = Record<string, unknown>;
  *   .build();
  * ```
  */
-export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
+export class ElementBuilder<
+  N extends string,
+  T extends BaseUIProperties = BaseUIProperties,
+> {
   /** The element's properties being built */
   protected properties: T;
 
   /** The element's name (without extension) */
-  protected elementName: string;
+  protected elementName: N;
 
   /** Optional base element being extended (@ syntax) */
   protected extendsRef?: string;
@@ -99,7 +187,7 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
     name: string,
     public type?: ElementType
   ) {
-    this.elementName = name;
+    this.elementName = name as N;
     this.properties = (type ? { type } : {}) as T;
   }
 
@@ -107,15 +195,22 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    * Creates a new instance of this builder for extension purposes.
    * Subclasses should override this to preserve their specific properties.
    *
+   * Note: Clears the type since extended elements inherit their type
+   * from the base element (via @extends syntax).
+   *
    * @param name - The name for the new builder instance.
    * @returns A new builder instance of the same type.
    * @internal
    */
   _createForExtension(name: string): this {
-    return new (this.constructor as new (
+    const instance = new (this.constructor as new (
       name: string,
       type?: ElementType
-    ) => this)(name, this.type);
+    ) => this)(name);
+    // Clear the type - it's inherited from the extended element
+    delete (instance.properties as Record<string, unknown>).type;
+    instance.type = undefined;
+    return instance;
   }
 
   // -------------------------------------------------------------------------
@@ -166,6 +261,8 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
 
   /**
    * Sets the base element to extend using @ syntax.
+   * NOTE: This should only be used when extending vanilla minecraft elements as this is unsafe.
+   * TODO: Create some type of strict reference check by generating all possibilities from vanilla minecraft types.
    *
    * Extended elements inherit all properties from the base and
    * can override specific values. This is the primary inheritance
@@ -187,30 +284,97 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    *   .extends("my_templates.base_panel")
    * ```
    */
-  extends(reference: string): this {
+  extends(reference: string, shouldClearType: boolean = true): this {
     this.extendsRef = reference;
+    if (shouldClearType) {
+      // Clear the type - it's inherited from the extended element
+      delete (this.properties as Record<string, unknown>).type;
+      this.type = undefined;
+    }
     return this;
   }
 
   /**
-   * Sets the base element to extend from another builder.
+   * Sets the base element to extend from another registered element
+   * within the SAME namespace.
    *
-   * Convenience method that extracts the name from a builder
-   * and uses it as the extension reference. Only the element name
-   * is used (not the full name with extension chain) because JSON UI
-   * extension works by referencing the element's defined name.
+   * The element being extended MUST have been added to a namespace first
+   * via `addToNamespace()`. This ensures compile-time safety for references.
    *
-   * @param builder - The builder whose element to extend.
+   * For extending elements from OTHER namespaces, use `extendsExternallyFrom()`.
+   *
+   * @param element - A NamespaceElement to extend (must be registered).
    * @returns This builder for method chaining.
    *
    * @example
    * ```typescript
-   * const basePanel = panel("base").fullSize().layer(1);
+   * const basePanel = panel("base").fullSize().addToNamespace(ns);
    * const derivedPanel = panel("derived").extendsFrom(basePanel);
+   * derivedPanel.addToNamespace(ns);
    * ```
    */
-  extendsFrom(builder: ElementBuilder): this {
-    return this.extends(builder.getName());
+  extendsFrom(element: NamespaceElement): this {
+    return this.extends(element.getName(), element.builder.type !== undefined);
+  }
+
+  /**
+   * Sets the base element to extend from a registered element
+   * in ANOTHER namespace.
+   *
+   * This generates the full "namespace.element" reference format
+   * required for cross-namespace extension in JSON UI.
+   *
+   * @param element - A NamespaceElement from another namespace.
+   * @returns This builder for method chaining.
+   *
+   * @example
+   * ```typescript
+   * // In shared_ui.ts
+   * const sharedButton = panel("button_base").addToNamespace(sharedNs);
+   *
+   * // In my_ui.ts
+   * const myButton = panel("my_button")
+   *   .extendsExternallyFrom(sharedButton)
+   *   .addToNamespace(ns);
+   * // Generates: "my_button@shared_ui.button_base"
+   * ```
+   */
+  extendsExternallyFrom(element: NamespaceElement): this {
+    return this.extends(
+      element.getQualifiedName(),
+      element.builder.type !== undefined
+    );
+  }
+
+  /**
+   * Adds this element to a namespace and returns a registered wrapper.
+   *
+   * This is the primary way to add elements to namespaces. The returned
+   * `NamespaceElement` can then be used with `extendsFrom()` to create
+   * type-safe extension hierarchies.
+   *
+   * @param ns - The namespace builder (implements INamespaceBuilder).
+   * @returns A NamespaceElement wrapper for type-safe references.
+   *
+   * @example Basic usage
+   * ```typescript
+   * const main = panel("main")
+   *   .fullSize()
+   *   .addToNamespace(ns);
+   * ```
+   *
+   * @example Extension chain
+   * ```typescript
+   * const base = panel("base").size(100, 100).addToNamespace(ns);
+   * const derived = panel("derived")
+   *   .extendsFrom(base)
+   *   .color([1, 0, 0])
+   *   .addToNamespace(ns);
+   * ```
+   */
+  addToNamespace(ns: INamespaceBuilder): NamespaceElement<this> {
+    ns._addInternal(this);
+    return new NamespaceElement(this, ns.getName());
   }
 
   // -------------------------------------------------------------------------
@@ -777,7 +941,7 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    *   )
    * ```
    */
-  controls(...children: (ControlReference | ElementBuilder)[]): this {
+  controls(...children: (ControlReference | ElementBuilder<string>)[]): this {
     if (!this.properties.controls) this.properties.controls = [];
     for (const child of children) {
       if (child instanceof ElementBuilder) {
@@ -806,7 +970,10 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    *   .addChild(childPanel, { offset: [60, 0] }) // Second instance with offset
    * ```
    */
-  addChild(builder: ElementBuilder, overrides: Partial<UIElement> = {}): this {
+  addChild(
+    builder: ElementBuilder<string>,
+    overrides: Partial<UIElement> = {}
+  ): this {
     const ref: ControlReference = {
       [builder.getFullName()]: overrides,
     };
@@ -827,7 +994,7 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
    * panel("parent").addChildren(child1, child2)
    * ```
    */
-  addChildren(...builders: ElementBuilder[]): this {
+  addChildren(...builders: ElementBuilder<string>[]): this {
     for (const builder of builders) {
       this.addChild(builder);
     }
@@ -1662,13 +1829,13 @@ export class ElementBuilder<T extends BaseUIProperties = BaseUIProperties> {
  *   .anchor("center");
  * ```
  */
-export class PanelBuilder extends ElementBuilder {
+export class PanelBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new panel builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "panel");
   }
 }
@@ -1686,13 +1853,13 @@ export class PanelBuilder extends ElementBuilder {
  *   .size("100%", 32);
  * ```
  */
-export class StackPanelBuilder extends ElementBuilder {
+export class StackPanelBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new stack panel builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "stack_panel");
   }
 
@@ -1739,13 +1906,13 @@ export class StackPanelBuilder extends ElementBuilder {
  *   .collectionName("inventory_items");
  * ```
  */
-export class GridBuilder extends ElementBuilder {
+export class GridBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new grid builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "grid");
   }
 
@@ -1816,13 +1983,13 @@ export class GridBuilder extends ElementBuilder {
  *   .fontSize("large");
  * ```
  */
-export class LabelBuilder extends ElementBuilder {
+export class LabelBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new label builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "label");
   }
 
@@ -1943,9 +2110,9 @@ export class LabelBuilder extends ElementBuilder {
   }
 }
 
-export class BoundLabelBuilder extends LabelBuilder {
+export class BoundLabelBuilder<N extends string> extends LabelBuilder<N> {
   constructor(
-    name: string,
+    name: N,
     public bindingName: string = "text"
   ) {
     super(name);
@@ -1974,13 +2141,13 @@ export class BoundLabelBuilder extends LabelBuilder {
  *   .nineslice(4);
  * ```
  */
-export class ImageBuilder extends ElementBuilder {
+export class ImageBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new image builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "image");
   }
 
@@ -2107,9 +2274,9 @@ export class ImageBuilder extends ElementBuilder {
   }
 }
 
-export class BoundImageBuilder extends ImageBuilder {
+export class BoundImageBuilder<N extends string> extends ImageBuilder<N> {
   constructor(
-    name: string,
+    name: N,
     public bindingName: string = "texture"
   ) {
     super(name);
@@ -2138,13 +2305,13 @@ export class BoundImageBuilder extends ImageBuilder {
  *   .pressedControl("pressed");
  * ```
  */
-export class ButtonBuilder extends ElementBuilder {
+export class ButtonBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new button builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "button");
   }
 
@@ -2223,13 +2390,13 @@ export class ButtonBuilder extends ElementBuilder {
  *   .uncheckedControl("off");
  * ```
  */
-export class ToggleBuilder extends ElementBuilder {
+export class ToggleBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new toggle builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "toggle");
   }
 
@@ -2307,13 +2474,13 @@ export class ToggleBuilder extends ElementBuilder {
  *
  * @see https://wiki.bedrock.dev/json-ui/json-ui-documentation#custom-render
  */
-export class CustomBuilder extends ElementBuilder {
+export class CustomBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new custom builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "custom");
   }
 
@@ -2422,13 +2589,13 @@ export class CustomBuilder extends ElementBuilder {
  *   });
  * ```
  */
-export class FactoryBuilder extends ElementBuilder {
+export class FactoryBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new factory builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "factory");
   }
 
@@ -2457,13 +2624,13 @@ export class FactoryBuilder extends ElementBuilder {
  *   .touchMode();
  * ```
  */
-export class ScrollViewBuilder extends ElementBuilder {
+export class ScrollViewBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new scroll view builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "scroll_view");
   }
 
@@ -2541,13 +2708,13 @@ export class ScrollViewBuilder extends ElementBuilder {
  *   .renderGameBehind(false);
  * ```
  */
-export class ScreenBuilder extends ElementBuilder {
+export class ScreenBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new screen builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "screen");
   }
 
@@ -2615,13 +2782,13 @@ export class ScreenBuilder extends ElementBuilder {
  *   .hoverEnabled();
  * ```
  */
-export class InputPanelBuilder extends ElementBuilder {
+export class InputPanelBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new input panel builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "input_panel");
   }
 
@@ -2670,13 +2837,13 @@ export class InputPanelBuilder extends ElementBuilder {
  *   .placeholderControl("placeholder");
  * ```
  */
-export class EditBoxBuilder extends ElementBuilder {
+export class EditBoxBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new edit box builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "edit_box");
   }
 
@@ -2745,13 +2912,13 @@ export class EditBoxBuilder extends ElementBuilder {
  *   .sliderBoxControl("thumb");
  * ```
  */
-export class SliderBuilder extends ElementBuilder {
+export class SliderBuilder<N extends string> extends ElementBuilder<N> {
   /**
    * Creates a new slider builder.
    *
    * @param name - The element name.
    */
-  constructor(name: string) {
+  constructor(name: N) {
     super(name, "slider");
   }
 

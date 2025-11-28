@@ -139,10 +139,10 @@ export function phudPhoneConditionalBindings(): Binding[] {
  * )
  * ```
  */
-export function phudText(
-  labelBuilder: BoundLabelBuilder,
-  propertyName: string
-): BoundLabelBuilder {
+export function phudText<N extends string>(
+  labelBuilder: BoundLabelBuilder<N>,
+  propertyName: N
+): BoundLabelBuilder<N> {
   return labelBuilder.bindings(
     phudRead(propertyName, labelBuilder.bindingName, strip("${prop}"))
   );

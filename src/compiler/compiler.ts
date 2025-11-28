@@ -36,6 +36,7 @@ import type {
 } from "./types";
 import { DEFAULT_CONFIG } from "./types";
 import type { UIDefs, GlobalVariables } from "../types";
+import type { NamespaceBuilder } from "../builders/namespace";
 
 // Create jiti instance for importing TypeScript files at runtime
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
@@ -322,8 +323,26 @@ export class UICompiler {
       const definitions = Array.isArray(exported) ? exported : [exported];
 
       for (const def of definitions) {
-        // Validate definition has required namespace property
-        if (!def || typeof def !== "object" || !def.namespace) {
+        if (!def || typeof def !== "object") {
+          console.log(`  Skipped: ${relativePath} (invalid definition)`);
+          continue;
+        }
+
+        // Handle NamespaceBuilder (from defineUI/redefineUI)
+        // Use duck-typing since instanceof doesn't work across jiti module boundaries
+        if (this.isNamespaceBuilder(def)) {
+          const uiDef: UIDefinition = {
+            namespace: def.build(),
+            filename: def.filename,
+            subdir: def.subdir,
+            isVanillaOverride: def.isVanillaOverride,
+          };
+          this.processDefinition(uiDef, relativePath);
+          continue;
+        }
+
+        // Handle legacy UIDefinition format
+        if (!("namespace" in def) || !def.namespace) {
           console.log(
             `  Skipped: ${relativePath} (invalid definition - missing namespace)`
           );
@@ -339,6 +358,31 @@ export class UICompiler {
         stack: err.stack,
       });
     }
+  }
+
+  /**
+   * Checks if an object is a NamespaceBuilder using duck-typing.
+   *
+   * We can't use instanceof because jiti loads modules separately,
+   * causing different class identities across module boundaries.
+   *
+   * @param obj - The object to check.
+   * @returns True if the object quacks like a NamespaceBuilder.
+   * @private
+   */
+  private isNamespaceBuilder(obj: unknown): obj is NamespaceBuilder & {
+    filename?: string;
+    subdir?: string;
+    isVanillaOverride?: boolean;
+  } {
+    return (
+      typeof obj === "object" &&
+      obj !== null &&
+      "build" in obj &&
+      typeof (obj as NamespaceBuilder).build === "function" &&
+      "getName" in obj &&
+      typeof (obj as NamespaceBuilder).getName === "function"
+    );
   }
 
   /**

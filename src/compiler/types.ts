@@ -7,6 +7,7 @@
  */
 
 import type { UINamespace, GlobalVariables, UIDefs } from "../types";
+import type { NamespaceBuilder } from "../builders/namespace";
 
 // ============================================================================
 // Compiled File Types
@@ -108,10 +109,15 @@ export interface UIDefinition {
 /**
  * Multiple UI definitions from a single source file.
  *
- * Source files can export either a single UIDefinition or
- * an array of definitions.
+ * Source files can export:
+ * - A NamespaceBuilder (from defineUI/redefineUI)
+ * - A single UIDefinition (legacy format)
+ * - An array of definitions
  */
-export type UIExport = UIDefinition | UIDefinition[];
+export type UIExport =
+  | NamespaceBuilder
+  | UIDefinition
+  | (NamespaceBuilder | UIDefinition)[];
 
 // ============================================================================
 // Compiler Configuration

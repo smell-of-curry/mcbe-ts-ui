@@ -388,8 +388,27 @@ export function notEmpty(prop: string): string {
  * contains("#text", "search")  // "(not ((#text - 'search') = #text))"
  * ```
  */
-export function contains(prop: string, substring: string): string {
-  return `(not ((${prop} - '${substring}') = ${prop}))`;
+export function contains(
+  prop: string,
+  substring: string,
+  stringWrap = true
+): string {
+  return `(not ((${prop} - ${stringWrap ? `'${substring}'` : substring}) = ${prop}))`;
+}
+
+/**
+ * Check if a property does not contain a substring.
+ *
+ * @param prop - The property reference
+ * @param substring - The substring to search for
+ * @returns Expression that evaluates to true if substring does not exist
+ */
+export function notContain(
+  prop: string,
+  substring: string,
+  stringWrap = true
+): string {
+  return `((${prop} - ${stringWrap ? `'${substring}'` : substring}) = ${prop})`;
 }
 
 // ============================================================================

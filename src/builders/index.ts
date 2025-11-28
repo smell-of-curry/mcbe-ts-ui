@@ -19,6 +19,7 @@
 // Element builders
 export {
   ElementBuilder,
+  NamespaceElement,
   PanelBuilder,
   StackPanelBuilder,
   GridBuilder,
@@ -41,6 +42,7 @@ export {
   namespace,
   ref,
   extend,
+  extendExternal,
   extendRaw,
   fromBuilder,
   nsRef,
@@ -100,7 +102,7 @@ import {
  *   );
  * ```
  */
-export function panel(name: string): PanelBuilder {
+export function panel<N extends string>(name: N): PanelBuilder<N> {
   return new PanelBuilder(name);
 }
 
@@ -132,10 +134,10 @@ export function panel(name: string): PanelBuilder {
  *   .size(150, "100%c");
  * ```
  */
-export function stackPanel(
-  name: string,
+export function stackPanel<N extends string>(
+  name: N,
   orientation: "horizontal" | "vertical"
-): StackPanelBuilder {
+): StackPanelBuilder<N> {
   return new StackPanelBuilder(name).orientation(orientation);
 }
 
@@ -165,7 +167,7 @@ export function stackPanel(
  *   .maxItems(9);
  * ```
  */
-export function grid(name: string): GridBuilder {
+export function grid<N extends string>(name: N): GridBuilder<N> {
   return new GridBuilder(name);
 }
 
@@ -201,7 +203,10 @@ export function grid(name: string): GridBuilder {
  *   .localize();
  * ```
  */
-export function label(name: string, text: string): LabelBuilder {
+export function label<N extends string>(
+  name: N,
+  text: string
+): LabelBuilder<N> {
   return new LabelBuilder(name).text(text);
 }
 
@@ -212,10 +217,10 @@ export function label(name: string, text: string): LabelBuilder {
  * @param bindingName - The name of the binding to use for the label.
  * @returns
  */
-export function boundLabel(
-  name: string,
+export function boundLabel<N extends string>(
+  name: N,
   bindingName: string = "text"
-): BoundLabelBuilder {
+): BoundLabelBuilder<N> {
   return new BoundLabelBuilder(name, bindingName);
 }
 
@@ -260,7 +265,10 @@ export function boundLabel(
  *   .fullSize();
  * ```
  */
-export function image(name: string, texture: string): ImageBuilder {
+export function image<N extends string>(
+  name: N,
+  texture: string
+): ImageBuilder<N> {
   return new ImageBuilder(name).texture(texture);
 }
 
@@ -271,10 +279,10 @@ export function image(name: string, texture: string): ImageBuilder {
  * @param bindingName - The name of the binding to use for the image.
  * @returns
  */
-export function boundImage(
-  name: string,
+export function boundImage<N extends string>(
+  name: N,
   bindingName: string = "texture"
-): BoundImageBuilder {
+): BoundImageBuilder<N> {
   return new BoundImageBuilder(name, bindingName);
 }
 
@@ -303,7 +311,7 @@ export function boundImage(
  *   .variable("button_text", "Click Me");
  * ```
  */
-export function button(name: string): ButtonBuilder {
+export function button<N extends string>(name: N): ButtonBuilder<N> {
   return new ButtonBuilder(name);
 }
 
@@ -333,7 +341,7 @@ export function button(name: string): ButtonBuilder {
  *   .variable("toggle_group_forced_index", 0);
  * ```
  */
-export function toggle(name: string): ToggleBuilder {
+export function toggle<N extends string>(name: N): ToggleBuilder<N> {
   return new ToggleBuilder(name);
 }
 
@@ -363,7 +371,7 @@ export function toggle(name: string): ToggleBuilder {
  *   });
  * ```
  */
-export function custom(name: string): CustomBuilder {
+export function custom<N extends string>(name: N): CustomBuilder<N> {
   return new CustomBuilder(name);
 }
 
@@ -385,7 +393,7 @@ export function custom(name: string): CustomBuilder {
  *   });
  * ```
  */
-export function factory(name: string): FactoryBuilder {
+export function factory<N extends string>(name: N): FactoryBuilder<N> {
   return new FactoryBuilder(name);
 }
 
@@ -414,7 +422,7 @@ export function factory(name: string): FactoryBuilder {
  *   .scrollSpeed(2);
  * ```
  */
-export function scrollView(name: string): ScrollViewBuilder {
+export function scrollView<N extends string>(name: N): ScrollViewBuilder<N> {
   return new ScrollViewBuilder(name);
 }
 
@@ -442,7 +450,7 @@ export function scrollView(name: string): ScrollViewBuilder {
  *   .alwaysAcceptsInput();
  * ```
  */
-export function screen(name: string): ScreenBuilder {
+export function screen<N extends string>(name: N): ScreenBuilder<N> {
   return new ScreenBuilder(name);
 }
 
@@ -469,7 +477,7 @@ export function screen(name: string): ScreenBuilder {
  *   .consumeEvent();
  * ```
  */
-export function inputPanel(name: string): InputPanelBuilder {
+export function inputPanel<N extends string>(name: N): InputPanelBuilder<N> {
   return new InputPanelBuilder(name);
 }
 
@@ -497,7 +505,7 @@ export function inputPanel(name: string): InputPanelBuilder {
  *   .maxLength(5);
  * ```
  */
-export function editBox(name: string): EditBoxBuilder {
+export function editBox<N extends string>(name: N): EditBoxBuilder<N> {
   return new EditBoxBuilder(name);
 }
 
@@ -518,7 +526,7 @@ export function editBox(name: string): EditBoxBuilder {
  *   .sliderBoxControl("thumb");
  * ```
  */
-export function slider(name: string): SliderBuilder {
+export function slider<N extends string>(name: N): SliderBuilder<N> {
   return new SliderBuilder(name);
 }
 
@@ -545,6 +553,6 @@ export function slider(name: string): SliderBuilder {
  *   .insertBack("controls", ref("my_hud@my_ns.hud"));
  * ```
  */
-export function element(name: string): ElementBuilder {
+export function element<N extends string>(name: N): ElementBuilder<N> {
   return new ElementBuilder(name);
 }
