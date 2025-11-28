@@ -251,6 +251,43 @@ export class NamespaceBuilder<
   }
 
   /**
+   * Adds an element to this namespace and returns only the updated namespace.
+   *
+   * This is a convenience method for the common pattern where you add the final
+   * "main" element and only need the namespace back (not the element reference).
+   * Simplifies the syntax from:
+   *
+   * ```typescript
+   * const [, finalNs] = ns.add(panel("main").fullSize().controls(...));
+   * return finalNs;
+   * ```
+   *
+   * To:
+   *
+   * ```typescript
+   * return ns.setMain(panel("main").fullSize().controls(...));
+   * ```
+   *
+   * @param builder - The element builder to add (typically the main/root element).
+   * @returns The updated namespace builder with the element registered.
+   *
+   * @example
+   * ```typescript
+   * export default defineUI("my_ui", (ns) => {
+   *   const [header, ns1] = ns.add(panel("header").size("100%", 50));
+   *   const content = panel("content").fullSize().controls(header);
+   *   return ns1.setMain(content);
+   * });
+   * ```
+   */
+  setMain<B extends ElementBuilder<N>, N extends string>(
+    builder: B
+  ): NamespaceBuilder<TElements & Record<N, NamespaceElement<B>>> {
+    const [, updatedNs] = this.add(builder);
+    return updatedNs;
+  }
+
+  /**
    * Adds an animation to this namespace.
    *
    * Animations are referenced by elements via `uv` or `anims` properties.
