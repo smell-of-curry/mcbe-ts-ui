@@ -47,9 +47,9 @@ import type { Color } from "../types";
  * ```
  */
 export function fromRGB(r: number, g: number, b: number): Color {
-  // Round to 2 decimal places to avoid floating point precision issues in JSON output
-  const round = (n: number) => Math.round(n * 100) / 100;
-  return [round(r / 255), round(g / 255), round(b / 255)];
+  // Three decimals preserve existing JSON UI colors without float noise.
+  const truncate = (n: number) => Math.trunc(n * 1000) / 1000;
+  return [truncate(r / 255), truncate(g / 255), truncate(b / 255)];
 }
 
 /**
@@ -248,12 +248,12 @@ export function defineVars(
  *
  * @example
  * ```typescript
- * first(80, "#level_number")  // "%.80s * #level_number"
- * first(1, "#text")           // "%.1s * #text"
+ * first(80, "#level_number")  // "(%.80s * #level_number)"
+ * first(1, "#text")           // "(%.1s * #text)"
  * ```
  */
 export function first(length: number, prop: string): string {
-  return `%.${length}s * ${prop}`;
+  return `(%.${length}s * ${prop})`;
 }
 
 /**

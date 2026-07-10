@@ -67,9 +67,9 @@ exports.texturePath = texturePath;
  * ```
  */
 function fromRGB(r, g, b) {
-    // Round to 2 decimal places to avoid floating point precision issues in JSON output
-    const round = (n) => Math.round(n * 100) / 100;
-    return [round(r / 255), round(g / 255), round(b / 255)];
+    // Three decimals preserve existing JSON UI colors without float noise.
+    const truncate = (n) => Math.trunc(n * 1000) / 1000;
+    return [truncate(r / 255), truncate(g / 255), truncate(b / 255)];
 }
 /**
  * Converts a hex color string to Minecraft's color format (0-1).
@@ -240,12 +240,12 @@ function defineVars(vars) {
  *
  * @example
  * ```typescript
- * first(80, "#level_number")  // "%.80s * #level_number"
- * first(1, "#text")           // "%.1s * #text"
+ * first(80, "#level_number")  // "(%.80s * #level_number)"
+ * first(1, "#text")           // "(%.1s * #text)"
  * ```
  */
 function first(length, prop) {
-    return `%.${length}s * ${prop}`;
+    return `(%.${length}s * ${prop})`;
 }
 /**
  * Skip the first N characters and get the rest.

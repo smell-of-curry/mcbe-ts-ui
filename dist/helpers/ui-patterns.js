@@ -223,9 +223,10 @@ function factoryBindings() {
  * @returns Array of bindings
  */
 function buttonFlagVisibility(flag, collectionName = "form_buttons") {
+    const isExpression = flag.startsWith("$") || flag.startsWith("#");
     return [
         (0, bindings_1.collectionBinding)("#form_button_text", collectionName),
-        (0, bindings_1.viewBinding)((0, expressions_1.contains)("#form_button_text", flag), "#visible"),
+        (0, bindings_1.viewBinding)((0, expressions_1.contains)("#form_button_text", flag, !isExpression), "#visible"),
     ];
 }
 /**

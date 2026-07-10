@@ -244,9 +244,10 @@ export function buttonFlagVisibility(
   flag: string,
   collectionName: string = "form_buttons"
 ): Binding[] {
+  const isExpression = flag.startsWith("$") || flag.startsWith("#");
   return [
     collectionBinding("#form_button_text", collectionName),
-    viewBinding(contains("#form_button_text", flag), "#visible"),
+    viewBinding(contains("#form_button_text", flag, !isExpression), "#visible"),
   ];
 }
 

@@ -180,8 +180,8 @@ export declare function defineVars(vars: Record<string, VariableValue>): Record<
  *
  * @example
  * ```typescript
- * first(80, "#level_number")  // "%.80s * #level_number"
- * first(1, "#text")           // "%.1s * #text"
+ * first(80, "#level_number")  // "(%.80s * #level_number)"
+ * first(1, "#text")           // "(%.1s * #text)"
  * ```
  */
 export declare function first(length: number, prop: string): string;
