@@ -420,11 +420,6 @@ export class ElementBuilder<
    * ```
    */
   size(width: SizeValue = "default", height: SizeValue = "default"): this {
-    if (width == "100%" || height == "100%")
-      console.warn(
-        "Optimization note: Size set of 100% is not needed, as thats the default value."
-      );
-
     const isChildPadding =
       (typeof width === "string" && width.includes("%c + ")) ||
       (typeof height === "string" && height.includes("%c + "));
@@ -462,7 +457,6 @@ export class ElementBuilder<
 
   /**
    * Sets the element to full size (100% x 100%).
-   * NOTE: This is a useless method, as by default all elements are full size.
    *
    * Shorthand for `size("100%", "100%")`.
    *

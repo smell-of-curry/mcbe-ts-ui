@@ -328,7 +328,6 @@ export declare class ElementBuilder<N extends string, T extends BaseUIProperties
     sizePercent(width?: number, height?: number): this;
     /**
      * Sets the element to full size (100% x 100%).
-     * NOTE: This is a useless method, as by default all elements are full size.
      *
      * Shorthand for `size("100%", "100%")`.
      *
