@@ -3,9 +3,11 @@ const {
   NamespaceBuilder,
   boundImage,
   buttonFlagVisibility,
+  extendRaw,
   first,
   fromRGB,
   panel,
+  ref,
   strip,
 } = require("./dist");
 
@@ -15,6 +17,15 @@ assert.equal(
 );
 assert.deepEqual(fromRGB(191, 43, 54), [0.749, 0.168, 0.211]);
 assert.equal("texture" in boundImage("image").build(), false);
+assert.deepEqual(ref("image", { offset: "$offset" }), {
+  image: { offset: "$offset" },
+});
+assert.deepEqual(
+  extendRaw("item", "beacon.item_renderer", {
+    bindings: "$texture_bindings",
+  }),
+  { "item@beacon.item_renderer": { bindings: "$texture_bindings" } }
+);
 
 const visibilityExpression =
   buttonFlagVisibility("$button_id")[1].source_property_name;

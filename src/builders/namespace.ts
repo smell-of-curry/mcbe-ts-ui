@@ -634,9 +634,9 @@ export function namespace(name: string): NamespaceBuilder {
  */
 export function ref(
   name: string,
-  overrides: Partial<UIElement> = {}
+  overrides: Record<string, unknown> = {}
 ): ControlReference {
-  return { [name]: overrides };
+  return { [name]: overrides as Partial<UIElement> };
 }
 
 /**
@@ -728,9 +728,9 @@ export function extendExternal<
 export function extendRaw(
   name: string,
   base: string,
-  overrides: Partial<UIElement> = {}
+  overrides: Record<string, unknown> = {}
 ): ControlReference {
-  return { [`${name}@${base}`]: overrides };
+  return { [`${name}@${base}`]: overrides as Partial<UIElement> };
 }
 
 /**
@@ -759,9 +759,9 @@ export function extendRaw(
  */
 export function fromBuilder(
   builder: ElementBuilder<string>,
-  overrides: Partial<UIElement> = {}
+  overrides: Record<string, unknown> = {}
 ): ControlReference {
-  return { [builder.getFullName()]: overrides };
+  return { [builder.getFullName()]: overrides as Partial<UIElement> };
 }
 
 /**

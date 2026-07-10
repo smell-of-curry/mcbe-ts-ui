@@ -516,7 +516,7 @@ export declare function namespace(name: string): NamespaceBuilder;
  *   )
  * ```
  */
-export declare function ref(name: string, overrides?: Partial<UIElement>): ControlReference;
+export declare function ref(name: string, overrides?: Record<string, unknown>): ControlReference;
 /**
  * Extends a registered namespace element from the SAME namespace.
  * with a different name that extends the original.
@@ -587,7 +587,7 @@ export declare function extendExternal<T extends ElementBuilder<string>, N exten
  *   )
  * ```
  */
-export declare function extendRaw(name: string, base: string, overrides?: Partial<UIElement>): ControlReference;
+export declare function extendRaw(name: string, base: string, overrides?: Record<string, unknown>): ControlReference;
 /**
  * Creates a control reference from an ElementBuilder.
  *
@@ -612,7 +612,7 @@ export declare function extendRaw(name: string, base: string, overrides?: Partia
  *   )
  * ```
  */
-export declare function fromBuilder(builder: ElementBuilder<string>, overrides?: Partial<UIElement>): ControlReference;
+export declare function fromBuilder(builder: ElementBuilder<string>, overrides?: Record<string, unknown>): ControlReference;
 /**
  * Creates a fully-qualified element reference string.
  *
