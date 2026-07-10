@@ -244,7 +244,8 @@ class ElementBuilder {
      * The element being extended MUST have been added to a namespace first
      * via `addToNamespace()`. This ensures compile-time safety for references.
      *
-     * For extending elements from OTHER namespaces, use `extendsExternallyFrom()`.
+     * References are namespace-qualified because Bedrock does not reliably resolve
+     * local shorthand inside nested controls.
      *
      * @param element - A NamespaceElement to extend (must be registered).
      * @returns This builder for method chaining.
@@ -257,7 +258,7 @@ class ElementBuilder {
      * ```
      */
     extendsFrom(element) {
-        return this.extends(element.getName(), element.builder.type !== undefined);
+        return this.extends(element.getQualifiedName(), element.builder.type !== undefined);
     }
     /**
      * Sets the base element to extend from a registered element
