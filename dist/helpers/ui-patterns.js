@@ -25,6 +25,9 @@ exports.buttonEnabledBinding = buttonEnabledBinding;
 exports.fullButtonBindings = fullButtonBindings;
 exports.chestVisibility = chestVisibility;
 exports.itemTextureBindings = itemTextureBindings;
+exports.nonRendererItemBindings = nonRendererItemBindings;
+exports.formButtonPrefixVisibility = formButtonPrefixVisibility;
+exports.hoverTextBindings = hoverTextBindings;
 exports.imageTextureBindings = imageTextureBindings;
 exports.siblingImageVisibilityBinding = siblingImageVisibilityBinding;
 const bindings_1 = require("./bindings");
@@ -275,21 +278,64 @@ function chestVisibility(flag) {
         (0, bindings_1.viewBinding)((0, expressions_1.contains)("#title_text", flag), "#visible"),
     ];
 }
-// ============================================================================
-// Item Renderer Pattern Helpers
-// ============================================================================
 /**
  * Standard texture bindings for item renderers in forms.
  *
  * @param collectionName - Collection name (default: "form_buttons")
+ * @param options - Optional aux-expression tweaks
  * @returns Array of bindings for texture loading
  */
-function itemTextureBindings(collectionName = "form_buttons") {
+function itemTextureBindings(collectionName = "form_buttons", options = {}) {
+    const auxExpr = options.stripBracketSuffix
+        ? "(1 * (#form_button_texture - ']'))"
+        : "(#form_button_texture * 1)";
     return [
         (0, bindings_1.collectionBinding)("#form_button_texture", collectionName),
         (0, bindings_1.viewBinding)("(not (('%.8s' * #form_button_texture) = 'textures'))", "#visible"),
         (0, bindings_1.viewBinding)("(not ((#form_button_texture = '') or (#form_button_texture = 'loading')))", "#visible"),
-        (0, bindings_1.viewBinding)("(#form_button_texture * 1)", "#item_id_aux"),
+        (0, bindings_1.viewBinding)(auxExpr, "#item_id_aux"),
+    ];
+}
+/**
+ * Bindings for custom texture icons (path starts with `textures`).
+ *
+ * @param collectionName - Collection name (default: "form_buttons")
+ * @returns Array of bindings for non-item-renderer images
+ */
+function nonRendererItemBindings(collectionName = "form_buttons") {
+    return [
+        (0, bindings_1.collectionBinding)("#form_button_texture", collectionName, "#texture"),
+        (0, bindings_1.viewBinding)("(not ((#texture = '') or (#texture = 'loading')))", "#visible"),
+        (0, bindings_1.viewBinding)("(('%.8s' * #texture) = 'textures')", "#visible"),
+    ];
+}
+/**
+ * Collection + visibility when `#form_button_text` starts with a prefix.
+ *
+ * @param prefix - Prefix to match (e.g. `"cht:"`, `"inv:"`)
+ * @param collectionName - Collection name (default: "form_buttons")
+ * @returns Array of bindings
+ */
+function formButtonPrefixVisibility(prefix, collectionName = "form_buttons") {
+    return [
+        (0, bindings_1.collectionBindingNone)(collectionName),
+        (0, bindings_1.collectionDetailsBinding)(collectionName),
+        (0, bindings_1.collectionBinding)("#form_button_text", collectionName),
+        (0, bindings_1.viewBinding)(`(('%.${prefix.length}s' * #form_button_text) = '${prefix}')`, "#visible"),
+    ];
+}
+/**
+ * Hover-text renderer bindings that strip a fixed prefix length.
+ *
+ * @param stripLen - Characters to strip from the start of `#form_button_text`
+ * @param collectionName - Collection name (default: "form_buttons")
+ * @returns Array of bindings writing `#hover_text`
+ */
+function hoverTextBindings(stripLen = 58, collectionName = "form_buttons") {
+    return [
+        (0, bindings_1.collectionBinding)("#form_button_text", collectionName),
+        (0, bindings_1.collectionDetailsBinding)(collectionName),
+        (0, bindings_1.viewBinding)(`(#form_button_text - ('%.${stripLen}s' * #form_button_text))`, "#hover_text"),
     ];
 }
 /**

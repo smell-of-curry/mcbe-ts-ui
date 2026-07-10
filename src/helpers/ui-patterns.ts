@@ -316,14 +316,32 @@ export function chestVisibility(flag: string): Binding[] {
 // ============================================================================
 
 /**
+ * Options for {@link itemTextureBindings}.
+ */
+export interface ItemTextureBindingsOptions {
+  /**
+   * When true, strip a trailing `]` from `#form_button_texture` before
+   * coercing to `#item_id_aux` (chest form aux payloads).
+   *
+   * @default false
+   */
+  stripBracketSuffix?: boolean;
+}
+
+/**
  * Standard texture bindings for item renderers in forms.
  *
  * @param collectionName - Collection name (default: "form_buttons")
+ * @param options - Optional aux-expression tweaks
  * @returns Array of bindings for texture loading
  */
 export function itemTextureBindings(
-  collectionName: string = "form_buttons"
+  collectionName: string = "form_buttons",
+  options: ItemTextureBindingsOptions = {}
 ): Binding[] {
+  const auxExpr = options.stripBracketSuffix
+    ? "(1 * (#form_button_texture - ']'))"
+    : "(#form_button_texture * 1)";
   return [
     collectionBinding("#form_button_texture", collectionName),
     viewBinding(
@@ -334,7 +352,69 @@ export function itemTextureBindings(
       "(not ((#form_button_texture = '') or (#form_button_texture = 'loading')))",
       "#visible"
     ),
-    viewBinding("(#form_button_texture * 1)", "#item_id_aux"),
+    viewBinding(auxExpr, "#item_id_aux"),
+  ];
+}
+
+/**
+ * Bindings for custom texture icons (path starts with `textures`).
+ *
+ * @param collectionName - Collection name (default: "form_buttons")
+ * @returns Array of bindings for non-item-renderer images
+ */
+export function nonRendererItemBindings(
+  collectionName: string = "form_buttons"
+): Binding[] {
+  return [
+    collectionBinding("#form_button_texture", collectionName, "#texture"),
+    viewBinding(
+      "(not ((#texture = '') or (#texture = 'loading')))",
+      "#visible"
+    ),
+    viewBinding("(('%.8s' * #texture) = 'textures')", "#visible"),
+  ];
+}
+
+/**
+ * Collection + visibility when `#form_button_text` starts with a prefix.
+ *
+ * @param prefix - Prefix to match (e.g. `"cht:"`, `"inv:"`)
+ * @param collectionName - Collection name (default: "form_buttons")
+ * @returns Array of bindings
+ */
+export function formButtonPrefixVisibility(
+  prefix: string,
+  collectionName: string = "form_buttons"
+): Binding[] {
+  return [
+    collectionBindingNone(collectionName),
+    collectionDetailsBinding(collectionName),
+    collectionBinding("#form_button_text", collectionName),
+    viewBinding(
+      `(('%.${prefix.length}s' * #form_button_text) = '${prefix}')`,
+      "#visible"
+    ),
+  ];
+}
+
+/**
+ * Hover-text renderer bindings that strip a fixed prefix length.
+ *
+ * @param stripLen - Characters to strip from the start of `#form_button_text`
+ * @param collectionName - Collection name (default: "form_buttons")
+ * @returns Array of bindings writing `#hover_text`
+ */
+export function hoverTextBindings(
+  stripLen: number = 58,
+  collectionName: string = "form_buttons"
+): Binding[] {
+  return [
+    collectionBinding("#form_button_text", collectionName),
+    collectionDetailsBinding(collectionName),
+    viewBinding(
+      `(#form_button_text - ('%.${stripLen}s' * #form_button_text))`,
+      "#hover_text"
+    ),
   ];
 }
 

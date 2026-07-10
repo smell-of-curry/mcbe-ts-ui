@@ -149,12 +149,48 @@ export declare function fullButtonBindings(visibleExpression: string, enabledExp
  */
 export declare function chestVisibility(flag: string): Binding[];
 /**
+ * Options for {@link itemTextureBindings}.
+ */
+export interface ItemTextureBindingsOptions {
+    /**
+     * When true, strip a trailing `]` from `#form_button_texture` before
+     * coercing to `#item_id_aux` (chest form aux payloads).
+     *
+     * @default false
+     */
+    stripBracketSuffix?: boolean;
+}
+/**
  * Standard texture bindings for item renderers in forms.
  *
  * @param collectionName - Collection name (default: "form_buttons")
+ * @param options - Optional aux-expression tweaks
  * @returns Array of bindings for texture loading
  */
-export declare function itemTextureBindings(collectionName?: string): Binding[];
+export declare function itemTextureBindings(collectionName?: string, options?: ItemTextureBindingsOptions): Binding[];
+/**
+ * Bindings for custom texture icons (path starts with `textures`).
+ *
+ * @param collectionName - Collection name (default: "form_buttons")
+ * @returns Array of bindings for non-item-renderer images
+ */
+export declare function nonRendererItemBindings(collectionName?: string): Binding[];
+/**
+ * Collection + visibility when `#form_button_text` starts with a prefix.
+ *
+ * @param prefix - Prefix to match (e.g. `"cht:"`, `"inv:"`)
+ * @param collectionName - Collection name (default: "form_buttons")
+ * @returns Array of bindings
+ */
+export declare function formButtonPrefixVisibility(prefix: string, collectionName?: string): Binding[];
+/**
+ * Hover-text renderer bindings that strip a fixed prefix length.
+ *
+ * @param stripLen - Characters to strip from the start of `#form_button_text`
+ * @param collectionName - Collection name (default: "form_buttons")
+ * @returns Array of bindings writing `#hover_text`
+ */
+export declare function hoverTextBindings(stripLen?: number, collectionName?: string): Binding[];
 /**
  * Creates texture bindings for image display from collection.
  *
