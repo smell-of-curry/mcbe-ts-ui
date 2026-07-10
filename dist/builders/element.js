@@ -2087,7 +2087,6 @@ class BoundImageBuilder extends ImageBuilder {
     constructor(name, bindingName = "texture") {
         super(name);
         this.bindingName = bindingName;
-        this.texture("#" + bindingName);
     }
     /**
      * @internal

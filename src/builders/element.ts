@@ -2284,7 +2284,6 @@ export class BoundImageBuilder<N extends string> extends ImageBuilder<N> {
     public bindingName: string = "texture"
   ) {
     super(name);
-    this.texture("#" + bindingName);
   }
 
   /**

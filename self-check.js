@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const {
   NamespaceBuilder,
+  boundImage,
   buttonFlagVisibility,
   first,
   fromRGB,
@@ -13,6 +14,7 @@ assert.equal(
   "((%.22s * #title_text) - '_')"
 );
 assert.deepEqual(fromRGB(191, 43, 54), [0.749, 0.168, 0.211]);
+assert.equal("texture" in boundImage("image").build(), false);
 
 const visibilityExpression =
   buttonFlagVisibility("$button_id")[1].source_property_name;
